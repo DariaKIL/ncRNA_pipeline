@@ -25,6 +25,7 @@ library(dbplyr)
 ```
 ## Импортируем данные
 ```{r}
+setwd("/Users/dariakilina/GitHub/Micro-RNA_cardiology")
 coldata <- read_tsv("data/phenotableV.tsv", show_col_types = FALSE)
 coldata$type <- as.factor(coldata$type)
 coldata$patient <- as.factor(coldata$patient)
@@ -97,8 +98,6 @@ ggsave("./pictures/barplot_alldataset_normalised.tiff", plot = plt, width = 8, h
 coldata$condition <- relevel(coldata$condition, ref = "before")
 modelMatrix <- model.matrix(~type*condition + patient, data = coldata)
 modelMatrix
-qr(modelMatrix)$rank
-ncol(modelMatrix)
 ```
 
 
@@ -268,7 +267,6 @@ dim(dds_150)
 **Run Differential Expression Analysis for 150 type**
 ```{r}
 dds_150 <- DESeq(dds_150, fitType = "parametric")
-dds_150
 ```
 
 ```{r}
@@ -287,9 +285,9 @@ res_150
 ```{r}
 tiff("./pictures/PlotMA_standart_padj_0.05_type150.tiff", 
      width = 8, height = 6, units = "in", res = 300, bg = "white")
-plotMA(res_16, alpha = 0.05, ylim = c(-8, 8)) 
+plotMA(res_150, alpha = 0.05, ylim = c(-8, 8)) 
 dev.off()
-plotMA(res_16, alpha = 0.05, ylim = c(-8, 8)) 
+plotMA(res_150, alpha = 0.05, ylim = c(-8, 8)) 
 ```
 **Кастомный MA plot по p-value**
 ```{r}
@@ -425,6 +423,7 @@ sampleDists_150 <- dist(t(assay(rlt_150)))
 sampleDistMatrix_150 <- as.matrix(sampleDists_150)
 rownames(sampleDistMatrix_150) <- paste(rlt_150$condition, rlt_150$patient, sep="_patient")
 colnames(sampleDistMatrix_150) <- paste(rlt_150$condition, rlt_150$patient, sep="_patient")
+colors <- colorRampPalette(rev(brewer.pal(9, "Blues")) )(255)
 
 plt <- pheatmap(sampleDistMatrix_150,
          clustering_distance_rows = "euclidean",
@@ -449,7 +448,7 @@ rownames(up_150)
 rownames(down_150)
 ```
 перевела вручную: https://mirgenedb.org/browse/hsa
-Hsa-Mir-328 =	hsa-mir-328 	Eutheria  — клада зверей, включающая плацентарных и различные вымершие инфраклассы. Эутерии. жираф, крылан, ёж, лев.
+Hsa-Mir-328 =	hsa-mir-328 	Eutheria  — клада зверей, включающая плацентарных и различные вымершие инфраклассы. 
 Hsa-Mir-133-P1 = hsa-mir-133a-1 Gnathostomata 
 Hsa-Mir-133-P2 = hsa-mir-133b Gnathostomata
 Hsa-Mir-133-P3 = hsa-mir-133a-2 Gnathostomata
@@ -642,8 +641,8 @@ p2 <- dotplot(GO_enrich_down150_WIKI, showCategory = 20) +
     axis.text.y = element_text(size = 8)
   )
 
-p1 + p2
 combined_plot <- p1 + p2
+combined_plot
 
 ggsave("./pictures/GO_enrichment_dotplot_WIKIPATHWAY_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
 ```
@@ -680,7 +679,6 @@ dim(dds_16)
 **Run Differential Expression Analysis for 150 type**
 ```{r}
 dds_16 <- DESeq(dds_16, fitType = "parametric")
-dds_16
 ```
 
 ```{r}
@@ -885,7 +883,7 @@ head(mir_table)
 up_16_clean <- sub("_.*", "", row.names(up_16))
 up_16_converted <- mir_table$MiRBase_ID[match(up_16_clean, mir_table$MirGeneDB_ID)]
 
-#down_16_clean <- sub("_.*", "", row.names(down_16))
+down_16_clean <- sub("_.*", "", row.names(down_16))
 down_16_converted <- mir_table$MiRBase_ID[match(down_16_clean, mir_table$MirGeneDB_ID)]
 up_16_converted
 down_16_converted
@@ -926,12 +924,12 @@ converted_mirna_down16
 ```
 **Запрос таргетов из базы multiMiR**
 ```{r}
-targets16_up <- unique(get_multimir(org = "hsa", mirna = converted_mirna_up16$Accession, table = "predicted")@data$target_symbol)
-targets16_up
+# targets16_up <- unique(get_multimir(org = "hsa", mirna = converted_mirna_up16$Accession, table = "predicted")@data$target_symbol)
+# targets16_up
 ```
 ```{r}
-targets16_down <- unique(get_multimir(org = "hsa", mirna = converted_mirna_down16$Accession, table = "predicted")@data$target_symbol)
-targets16_down
+# targets16_down <- unique(get_multimir(org = "hsa", mirna = converted_mirna_down16$Accession, table = "predicted")@data$target_symbol)
+# targets16_down
 ```
 
 

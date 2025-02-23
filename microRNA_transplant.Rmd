@@ -25,11 +25,7 @@ library(dbplyr)
 ```
 ## Импортируем данные
 ```{r}
-coldata <- read_tsv("data/phenotableV.tsv", show_col_types = FALSE)
-coldata$type <- as.factor(coldata$type)
-coldata$patient <- as.factor(coldata$patient)
-coldata$condition <- as.factor(coldata$condition)
-coldata <- as.data.frame(coldata)
+coldata <- read_tsv("data/phenotable.tsv", show_col_types = FALSE)
 rownames(coldata) <- coldata$sample
 coldata
 ```
@@ -37,12 +33,14 @@ coldata
 ```{r}
 counts <- read.csv("data/miR.Counts.csv", header = TRUE, sep = ",")
 counts <- column_to_rownames(counts, var = "miRNA")
-#counts <- round(counts) # если используем нормализованные данные
 head(counts)
 ```
 ```{r}
 colnames(counts) <- gsub("^X", "", colnames(counts))
-common_samples <- intersect(colnames(counts), coldata$sample)
+
+counts_samples <- colnames(counts)
+phenotable_samples <- coldata$sample
+common_samples <- intersect(counts_samples, phenotable_samples)
 
 counts <- counts[, c(counts$miRNA, common_samples)]  
 counts <- counts[, rownames(coldata)] #ранжирую по колонки в counts так же как и названия строк в coldata
@@ -94,11 +92,11 @@ plt
 ggsave("./pictures/barplot_alldataset_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 ```{r}
-coldata$condition <- relevel(coldata$condition, ref = "before")
-modelMatrix <- model.matrix(~type*condition + patient, data = coldata)
+coldata$condition <- relevel(factor(coldata$condition), ref = "no_complications")
+modelMatrix <- model.matrix(~condition, coldata)
 modelMatrix
-qr(modelMatrix)$rank
-ncol(modelMatrix)
+qr(modelMatrix)$rank  # ранг матрицы
+ncol(modelMatrix) 
 ```
 
 
