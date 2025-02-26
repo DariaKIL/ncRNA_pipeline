@@ -267,7 +267,7 @@ res_humoral[order_indices, ]
 ```
 Visualisation for the first gene
 ```{r}
-plotCounts(dds, gene=which.max(res_humoral$log2FoldChange), intgroup="condition")
+#plotCounts(dds, gene=which.max(res_humoral$log2FoldChange), intgroup="condition")
 plotCounts(dds, gene=which.min(res_humoral$padj), intgroup="condition")
 #plotCounts(dds, gene=rownames(res)[which.min(res$padj[which.max(res$log2FoldChange)])], intgroup="condition")
 ```
@@ -308,7 +308,7 @@ rownames(annotation_col) <- colnames(datamatrix)
 # coldata_150
 
 annotation_colors <- list(
-  condition = c("no_complications" = "#FFCC00", "humoral" = "#3399FF", "cellular" = "green", "TCAD" = "red")
+  condition = c("no_complications" = "#FFCC00", "humoral" = "#3399FF"))
 
 pheatmap(datamatrix,
          cluster_rows = TRUE, 

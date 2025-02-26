@@ -487,44 +487,43 @@ targets150_up <- unique(get_multimir(org = "hsa", mirna = converted_mirna_down$A
 ```
 
 
-**Анализ обогащения, связанный со Biological Process, Cellular Component и Molecular Function**
-
+**Анализ обогащения, связанный со Biological Processes**
 ```{r}
 # msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C7", subcategory = "IMMUNESIGDB")
 # 
 # GO_enrich_up150_immum <- enricher(gene = targets150_up, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
 # GO_enrich_down150_immun <- enricher(gene = targets150_down, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
 
-GO_enrich_down150_all <- enrichGO(
+GO_enrich_down150_bp <- enrichGO(
   gene          = targets150_down,  
   OrgDb         = org.Hs.eg.db,
   keyType       = "SYMBOL",
-  ont           = "ALL", 
+  ont           = "BP", 
   pAdjustMethod = "BH",
   qvalueCutoff  = 0.05
 )
 
-GO_enrich_up150_all <- enrichGO(
+GO_enrich_up150_bp <- enrichGO(
   gene          = targets150_up,  
   OrgDb         = org.Hs.eg.db,
   keyType       = "SYMBOL",
-  ont           = "ALL", 
+  ont           = "BP", 
   pAdjustMethod = "BH",
   qvalueCutoff  = 0.05
 )
 ```
 
-**Визуализация Biological Process, Cellular Component и Molecular Function**
+**Визуализация Biological Processes**
 ```{r}
-p1 <- dotplot(GO_enrich_up150_all, showCategory = 20) + 
-  ggtitle("GO Enrichment of All Processes for Upregulated Targets in Vesicles 150") + 
+p1 <- dotplot(GO_enrich_up150_bp, showCategory = 20) + 
+  ggtitle("BP for Upregulated Targets in Vesicles 150") + 
   theme(
     plot.title = element_text(size = 12, face = "bold"),
     axis.text.y = element_text(size = 8)
   )
 
-p2 <- dotplot(GO_enrich_down150_all, showCategory = 20) + 
-  ggtitle("GO Enrichment of All Processes for Downregulated Targets in Vesicles 150") + 
+p2 <- dotplot(GO_enrich_down150_bp, showCategory = 20) + 
+  ggtitle("BP for Downregulated Targets in Vesicles 150") + 
   theme(
     plot.title = element_text(size = 12, face = "bold"),
     axis.text.y = element_text(size = 8)
@@ -534,7 +533,7 @@ p1 + p2
 
 combined_plot <- p1 + p2
 
-ggsave("./pictures/GO_enrichment_dotplot_all process_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
+ggsave("./pictures/GO_enrichment_dotplot_BP_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
 ```
 ```{r}
 GO_enrich_UP150_BP <- enrichplot::pairwise_termsim(GO_enrich_up150_bp, method = "JC")
@@ -550,13 +549,13 @@ plt <- emapplot(GO_enrich_UP150_BP,
 
 plt
 
-ggsave("./pictures/GO_enrichment_emapplot_ALL_up_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+ggsave("./pictures/GO_enrichment_emapplot_BP_up_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
 
 ```{r}
-GO_enrich_DOWN150_all <- enrichplot::pairwise_termsim(GO_enrich_down150_all, method = "JC")
+GO_enrich_DOWN150_BP <- enrichplot::pairwise_termsim(GO_enrich_down150_bp, method = "JC")
 
-plt <- emapplot(GO_enrich_DOWN150_all, 
+plt <- emapplot(GO_enrich_DOWN150_BP, 
          repel = TRUE,
          showCategory = 20) +
   ggtitle("All processes for DOWNregulated targets for vesicles 150") +
@@ -567,7 +566,7 @@ plt <- emapplot(GO_enrich_DOWN150_all,
 
 plt
 
-ggsave("./pictures/GO_enrichment_emapplot_ALL_down_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+ggsave("./pictures/GO_enrichment_emapplot_BP_down_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
 
 **GO Enrichment of Cellular Component**
@@ -992,11 +991,9 @@ Hsa-Mir-30-P1d = hsa-mir-30e
 MI (MicroRNA Gene ID) — это идентификатор предшественника (precursor) miRNA
 MIMAT (Mature miRNA ID) — это идентификатор зрелой (mature) miRNA, которая функционирует в клетке
 ```{r}
-up_16_converted <-  c("hsa-mir-185-5p", "hsa-mir-197-3p", "hsa-mir-152-5p", "hsa-mir-30d-3p", "hsa-mir-150-3p", "hsa-mir-361-3p", "hsa-mir-99b-5p", "hsa-mir-126-3p")
-down_16_converted <- c("hsa-mir-340-5p", "hsa-mir-181d-5p", "hsa-mir-223-5p")
+up_16_converted <-  c("hsa-miR-185-5p", "hsa-miR-197-3p", "hsa-miR-152-5p", "hsa-miR-30d-3p", "hsa-miR-150-3p", "hsa-miR-361-3p", "hsa-miR-99b-5p", "hsa-miR-126-3p")
+down_16_converted <- c("hsa-miR-340-5p", "hsa-miR-181d-5p", "hsa-miR-223-5p")
 
-# up_16_converted <-  c("hsa-mir-185", "hsa-mir-197", "hsa-mir-152", "hsa-mir-30d", "hsa-mir-150", "hsa-mir-361", "hsa-mir-99b", "hsa-mir-126")
-# down_16_converted <- c("hsa-mir-340", "hsa-mir-181d", "hsa-mir-223") #но есть только MI, а не MIMAT
 
 converted_mirna_up16 <- miRNAVersionConvert(up_16_converted)
 converted_mirna_down16 <- miRNAVersionConvert(down_16_converted)
@@ -1005,12 +1002,227 @@ converted_mirna_down16
 ```
 **Запрос таргетов из базы multiMiR**
 ```{r}
-# targets16_up <- unique(get_multimir(org = "hsa", mirna = converted_mirna_up16$Accession, table = "predicted")@data$target_symbol)
-# targets16_up
+targets16_up <- unique(get_multimir(org = "hsa", mirna = converted_mirna_up16$Accession, table = "validated")@data$target_symbol)
 ```
 ```{r}
-# targets16_down <- unique(get_multimir(org = "hsa", mirna = converted_mirna_down16$Accession, table = "predicted")@data$target_symbol)
-# targets16_down
+targets16_down <- unique(get_multimir(org = "hsa", mirna = converted_mirna_down16$Accession, table = "validated")@data$target_symbol)
 ```
+**Анализ обогащения, связанный со Biological Process**
+```{r}
+GO_enrich_up16_bp <- enrichGO(
+  gene          = targets16_up,  
+  OrgDb         = org.Hs.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "BP", 
+  pAdjustMethod = "BH",
+  qvalueCutoff  = 0.05
+)
+
+GO_enrich_down16_bp <- enrichGO(
+  gene          = targets16_down,  
+  OrgDb         = org.Hs.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "BP", 
+  pAdjustMethod = "BH",
+  qvalueCutoff  = 0.05
+)
+```
+
+```{r}
+p1 <- dotplot(GO_enrich_up16_bp, showCategory = 20) + 
+  ggtitle("BP for Upregulated Targets in Vesicles 16") + 
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.y = element_text(size = 12)
+  )
+
+p2 <- dotplot(GO_enrich_down16_bp, showCategory = 20) + 
+  ggtitle("BP for Downregulated Targets in Vesicles 16") + 
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.y = element_text(size = 12)
+  )
+combined_plot <- p1 + p2
+combined_plot
+ggsave("./pictures/GO_enrichment_dotplot_BP_type16.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
+```
+
+```{r}
+GO_enrich_UP16_BP <- enrichplot::pairwise_termsim(GO_enrich_up16_bp, method = "JC")
+
+plt <- emapplot(GO_enrich_UP16_BP, 
+         repel = TRUE,
+         showCategory = 20) +
+  ggtitle("BP for UPregulated targets for vesicles 16") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 3)
+    )   
+
+plt
+
+ggsave("./pictures/GO_enrichment_emapplot_BP_up_type16.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+```{r}
+GO_enrich_DOWN16_all <- enrichplot::pairwise_termsim(GO_enrich_down16_all, method = "JC")
+
+plt <- emapplot(GO_enrich_DOWN16_all, 
+         repel = TRUE,
+         showCategory = 20) +
+  ggtitle("BP for DOWNregulated targets for vesicles 16") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 3)
+    )    
+
+plt
+
+ggsave("./pictures/GO_enrichment_emapplot_BP_down_type16.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+**GO Enrichment of Cellular Component**
+```{r}
+GO_enrich_down16_CC <- enrichGO(
+  gene          = targets16_down,  
+  OrgDb         = org.Hs.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "CC", 
+  pAdjustMethod = "BH",
+  qvalueCutoff  = 0.05
+)
+
+GO_enrich_up16_CC <- enrichGO(
+  gene          = targets16_up,  
+  OrgDb         = org.Hs.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "CC", 
+  pAdjustMethod = "BH",
+  qvalueCutoff  = 0.05
+)
+```
+
+```{r}
+p1 <- dotplot(GO_enrich_up16_CC, showCategory = 20) + 
+  ggtitle("6Cellular Component for Upregulated Targets in Vesicles 16") + 
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.y = element_text(size = 12)
+  )
+
+p2 <- dotplot(GO_enrich_down16_CC, showCategory = 20) + 
+  ggtitle("Cellular Component for Downregulated Targets in Vesicles 16") + 
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.y = element_text(size = 12)
+  )
+
+p1 + p2
+
+combined_plot <- p1 + p2
+ggsave("./pictures/GO_enrichment_dotplot_CC_type16.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
+```
+```{r}
+GO_enrich_UP16_CC <- enrichplot::pairwise_termsim(GO_enrich_up16_CC, method = "JC")
+
+plt <- emapplot(GO_enrich_UP16_CC, 
+         repel = TRUE,
+         showCategory = 20) +
+  ggtitle("Cellular processes for UPregulated targets for vesicles 16") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 3)
+    )   
+
+plt
+
+ggsave("./pictures/GO_enrichment_emapplot_CC_up_type16.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+```{r}
+GO_enrich_DOWN16_CC <- enrichplot::pairwise_termsim(GO_enrich_down16_CC, method = "JC")
+
+plt <- emapplot(GO_enrich_DOWN16_CC, 
+         repel = TRUE,
+         showCategory = 25) +
+  ggtitle("Cellular processes for DOWNregulated targets for vesicles 16") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 3)
+    )    
+
+plt
+
+ggsave("./pictures/GO_enrichment_emapplot_CC_down_type16.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+**GO Enrichment of Molecular Function**
+```{r}
+GO_enrich_down16_MF <- enrichGO(
+  gene          = targets16_down,  
+  OrgDb         = org.Hs.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "MF", 
+  pAdjustMethod = "BH",
+  qvalueCutoff  = 0.05
+)
+
+GO_enrich_up16_MF <- enrichGO(
+  gene          = targets16_up,  
+  OrgDb         = org.Hs.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "MF", 
+  pAdjustMethod = "BH",
+  qvalueCutoff  = 0.05
+)
+
+p1 <- dotplot(GO_enrich_up16_MF, showCategory = 20) + 
+  ggtitle("Molecular Function for Upregulated Targets in Vesicles 16") + 
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.y = element_text(size = 12)
+  )
+
+p2 <- dotplot(GO_enrich_down16_MF, showCategory = 20) + 
+  ggtitle("Molecular Functiont for Downregulated Targets in Vesicles 16") + 
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.y = element_text(size = 12)
+  )
+
+combined_plot <- p1 + p2
+combined_plot
+ggsave("./pictures/GO_enrichment_dotplot_MF_type16.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
+```
+```{r}
+GO_enrich_UP16_MF <- enrichplot::pairwise_termsim(GO_enrich_up16_MF, method = "JC")
+
+plt <- emapplot(GO_enrich_UP16_MF, 
+         repel = TRUE,
+         showCategory = 25) +
+  ggtitle("Molecular Function processes for UPregulated targets for vesicles 16") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 3)
+    )   
+
+plt
+
+ggsave("./pictures/GO_enrichment_emapplot_MF_up_type16.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+```{r}
+GO_enrich_DOWN16_MF <- enrichplot::pairwise_termsim(GO_enrich_down16_MF, method = "JC")
+
+plt <- emapplot(GO_enrich_DOWN16_MF, 
+         repel = TRUE,
+         showCategory = 25) +
+  ggtitle("Molecular Function processes for DOWNregulated targets for vesicles 16") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 3)
+    )   
+
+plt
+
+ggsave("./pictures/GO_enrichment_emapplot_MF_down_type16.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+
+
 
 
