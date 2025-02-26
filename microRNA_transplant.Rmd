@@ -156,8 +156,8 @@ meanSdPlot(assay(vsd)) #показывает, как изменяется ста
 pcaData <- plotPCA(rlt, intgroup=c("condition"), returnData = TRUE)
 percentVar <- round(100 * attr(pcaData, "percentVar"))
 
-coldata$sample <- gsub("_.*", "", coldata$sample)
-pcaData$sample <- coldata$sample
+pcaData$sample <- gsub("_.*", "", coldata$sample)
+
 
 plt <- ggplot(pcaData, aes(PC1, PC2, color = condition)) +
   geom_text(aes(label=sample), size=3, vjust=1.5) +
@@ -289,38 +289,41 @@ plt <- EnhancedVolcano(res_humoral,
 plt
 ggsave("./pictures_transpl/transpl_VolcanoPlot_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
+```{r}
+coldata_filtered <- coldata[coldata$condition %in% c("humoral", "no_complications"), ]
+coldata_filtered
+```
 
 **Plot a heatmap of diff expressed genes**
 ```{r}
 res_sign_humoral <- subset(res_humoral, padj < 0.05 & !is.na(padj) & abs(log2FoldChange) > 1.0)
 res_sign_humoral <- res_sign_humoral[order(res_sign_humoral$log2FoldChange, decreasing = TRUE), ]
 
-sig_genes <- rownames(res_sign_humoral)  # Получаем имена генов, которые прошли фильтрацию
+sig_genes <- rownames(res_sign_humoral)  
 
 de_mat <- assay(rlt)[sig_genes, ] 
-datamatrix <- t(scale(t(de_mat)))
 
-annotation_col <- data.frame(condition = coldata$condition)
+de_mat_filtered <- de_mat[, coldata_filtered$sample]
+#datamatrix <- t(scale(t(de_mat_filtered)))
+datamatrix <- de_mat_filtered
+
+annotation_col <- data.frame(condition = coldata_filtered$condition)
 rownames(annotation_col) <- colnames(datamatrix)
-
-# coldata_humoral <- coldata[coldata$type == 150, ]
-# rownames(coldata_150) <- coldata_150$sample
-# coldata_150
 
 annotation_colors <- list(
   condition = c("no_complications" = "#FFCC00", "humoral" = "#3399FF"))
 
-pheatmap(datamatrix,
+plt <- pheatmap(datamatrix,
          cluster_rows = TRUE, 
          show_rownames = TRUE, 
          cluster_cols = TRUE, 
          annotation_col = annotation_col,
          annotation_colors = annotation_colors,
-         display_numbers = TRUE,
-         legend = FALSE,
+         display_numbers = FALSE,
+         legend = TRUE,
          fontsize = 15)  
 
-# ggsave("./pictures_transpl/transpl_Heatmap of diff expressed genes_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_transpl/transpl_Heatmap of diff expressed genes_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 
 
@@ -335,19 +338,52 @@ down_humoral <- res_sign_humoral %>%
 rownames(up_humoral)
 rownames(down_humoral)
 ```
-перевела вручную: https://mirgenedb.org/browse/hsa
-
+	
+Переводим в miRBase
 	•	miRBase: https://www.mirbase.org/
 	•	MirGeneDB: https://mirgenedb.org/
 ```{r}
-mirna_names_down <- c("hsa-miR-133a-3p", "hsa-miR-133a-3p", "hsa-miR-208a-3p", "hsa-miR-499a-5p")
+url <- "https://mirgenedb.org/browse/hsa"
+page <- read_html(url)
 ```
 
-**Конвертация в MIMATID**
+Парсим таблицу
 ```{r}
-converted_mirna_up <- miRNAVersionConvert(mirna_names_up)
+mir_table <- page %>%
+  html_element("table") %>%
+  html_table(fill = TRUE) 
+
+mir_table <- mir_table[-c(1:3), c(1,2) ] 
+colnames(mir_table) <- c("MirGeneDB_ID", "MiRBase_ID")
+mir_table$MirGeneDB_ID <- sub(" V", "", mir_table$MirGeneDB_ID)
+
+head(mir_table)
+```
+```{r}
+down_humoral_clean <- sub("_.*", "", row.names(down_humoral))
+down_humoral_converted <- mir_table$MiRBase_ID[match(down_humoral_clean, mir_table$MirGeneDB_ID)]
+down_humoral_converted
+```
+
+**Конвертация в MIMATID** 
+NA без соответствия удалила из анализа
+
+NA Hsa-Mir-148-P2_3p  есть три похожих соответствия:
+Hsa-Mir-148-P1	hsa-mir-148a																			
+Hsa-Mir-148-P3	hsa-mir-152																				
+Hsa-Mir-148-P4	hsa-mir-148b
+
+NA Hsa-Mir-10-P2a_5p есть три похожих соответствие: 
+Hsa-Mir-10-P2b	hsa-mir-99b															
+Hsa-Mir-10-P2c	hsa-mir-99a																		
+Hsa-Mir-10-P2d	hsa-mir-100
+
+[1] "Hsa-Mir-146-P1_5p"   "Hsa-Mir-425_3p*"     "Hsa-Mir-148-P2_3p"   "Hsa-Mir-10-P3c_5p"   "Hsa-Mir-10-P2a_5p"  
+[6] "Hsa-Mir-193-P1b_5p*" "Hsa-Mir-193-P1b_3p" 
+
+```{r}
+mirna_names_down <- c("hsa-miR-146b-5p", "hsa-miR-425-3p", "hsa-miR-125b-5p", "hsa-miR-193a-5p", "hsa-miR-193a-3p")
 converted_mirna_down <- miRNAVersionConvert(mirna_names_down)
-converted_mirna_up
 converted_mirna_down
 ```
 
