@@ -386,32 +386,19 @@ mirna_names_down <- c("hsa-miR-146b-5p", "hsa-miR-425-3p", "hsa-miR-125b-5p", "h
 converted_mirna_down <- miRNAVersionConvert(mirna_names_down)
 converted_mirna_down
 ```
-
 **Запрос таргетов из базы multiMiR** 
 ```{r}
-targets150_down <- unique(get_multimir(org = "hsa", mirna = converted_mirna_up$Accession, table = "validated")@data$target_symbol)
-targets150_up <- unique(get_multimir(org = "hsa", mirna = converted_mirna_down$Accession, table = "validated")@data$target_symbol)
+targets_humoral_down <- unique(get_multimir(org = "hsa", mirna = converted_mirna_down$Accession, table = "validated")@data$target_symbol)
 #writeLines(targets_down, "targets_down150_list.txt")
-#writeLines(targets_up, "targets_up150_list.txt")
 ```
-
 **Анализ обогащения из базы биологических процессов**
 ```{r}
 #msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "GO:BP")
 # targets_down <- readLines("targets_down150_list.txt")
 # targets_up <- readLines("targets_up150_list.txt")
 
-GO_enrich_down150_bp <- enrichGO(
-  gene          = targets150_down,  
-  OrgDb         = org.Hs.eg.db,
-  keyType       = "SYMBOL",
-  ont           = "BP", 
-  pAdjustMethod = "BH",
-  qvalueCutoff  = 0.05
-)
-
-GO_enrich_up150_bp <- enrichGO(
-  gene          = targets150_up,  
+GO_enrich_down_humoral_bp <- enrichGO(
+  gene          = targets_humoral_down,  
   OrgDb         = org.Hs.eg.db,
   keyType       = "SYMBOL",
   ont           = "BP", 
@@ -423,33 +410,24 @@ GO_enrich_up150_bp <- enrichGO(
 **Визуализация**
 ```{r}
 
-p1 <- dotplot(GO_enrich_down150_bp, showCategory = 20) + 
+p1 <- dotplot(GO_enrich_down_humoral_bp, showCategory = 20) + 
   ggtitle("GO Enrichment for DOWNregulated targets") + 
   theme(
     plot.title = element_text(size = 12, face = "bold"),
     axis.text.y = element_text(size = 11)
   )
 
-p2 <- dotplot(GO_enrich_up150_bp, showCategory = 20) + 
-  ggtitle("GO Enrichment for UPregulated targets") + 
-  theme(
-    plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 11)
-  )
+p1
 
-p1 + p2  
-
-combined_plot <- p1 + p2
-
-ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_BP_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
+ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_down_humoral_bp.tiff", plot = p1, width = 16, height = 10, dpi = 300)
 ```
 ```{r}
-GO_enrich_DOWN150_BP <- enrichplot::pairwise_termsim(GO_enrich_down150_bp, method = "JC")
+GO_enrich_DOWN_humoral_BP <- enrichplot::pairwise_termsim(GO_enrich_down_humoral_bp, method = "JC")
 
-plt <- emapplot(GO_enrich_DOWN150_BP, 
+plt <- emapplot(GO_enrich_DOWN_humoral_BP, 
          repel = TRUE,
          showCategory = 20) +
-  ggtitle("Biological processes for DOWNregulated targets for vesicles 150") +
+  ggtitle("Biological processes for DOWNregulated targets for humoral") +
   theme(
     plot.title = element_text(size = 12, face = "bold"),
     axis.text = element_text(size = 3)
@@ -457,7 +435,7 @@ plt <- emapplot(GO_enrich_DOWN150_BP,
 
 plt
 
-ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_BPdown_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_DOWN_humoral_BP.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
 ```{r}
 GO_enrich_UP150_BP <- enrichplot::pairwise_termsim(GO_enrich_up150_bp, method = "JC")
