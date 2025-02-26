@@ -1,5 +1,5 @@
 ---
-title: "micro-RNA Vesicles"
+title: "micro-RNA Heart Transplantation"
 output:
   html_notebook: default
 ---
@@ -338,7 +338,6 @@ down_humoral <- res_sign_humoral %>%
 rownames(up_humoral)
 rownames(down_humoral)
 ```
-	
 Переводим в miRBase
 	•	miRBase: https://www.mirbase.org/
 	•	MirGeneDB: https://mirgenedb.org/
@@ -437,208 +436,96 @@ plt
 
 ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_DOWN_humoral_BP.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
+##Клеточное отторжение
 ```{r}
-GO_enrich_UP150_BP <- enrichplot::pairwise_termsim(GO_enrich_up150_bp, method = "JC")
-
-plt <- emapplot(GO_enrich_UP150_BP, 
-         repel = TRUE,
-         showCategory = 20) +
-  ggtitle("Biological processes for UPregulated targets for vesicles 150") +
-  theme(
-    plot.title = element_text(size = 12, face = "bold"),
-    axis.text = element_text(size = 3)
-    )   
-
-plt
-
-ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_BPup_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
-```
-**Анализ обогащения из базы IMMUNESIGDB**
-IMMUNESIGDB: Наборы генов, связанные с иммунной системой, включая иммуно-онкологию и другие аспекты иммунитета.
-```{r}
-msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C7", subcategory = "IMMUNESIGDB")
-
-GO_enrich_up150_immum <- enricher(gene = targets150_up, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
-GO_enrich_down150_immun <- enricher(gene = targets150_down, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
-```
-
-**Визуализация IMMUNESIGDB**
-```{r}
-
-p1 <- dotplot(GO_enrich_up150_immum, showCategory = 20) + 
-  ggtitle("GO Enrichment IMMUNESIGD for UPregulated targets for vesicles 150") + 
-  theme(
-    plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 8)
-  )
-
-p2 <- dotplot(GO_enrich_down150_immun, showCategory = 20) + 
-  ggtitle("GO Enrichment IMMUNESIGD for DOWNregulated targets for vesicles 150") + 
-  theme(
-    plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 8)
-  )
-
-p1 + p2
-
-combined_plot <- p1 + p2
-
-ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_IMMUNESIGD_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
-```
-
-
-**Анализ обогащения из базы KEGG**
-```{r}
-msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG")
-
-GO_enrich_up150_KEGG <- enricher(gene = targets150_up, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
-GO_enrich_down150_KEGG <- enricher(gene = targets150_down, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
-
-p1 <- dotplot(GO_enrich_up150_KEGG, showCategory = 20) + 
-  ggtitle("GO Enrichment KEGG for UPregulated targets for vesicles 150") + 
-  theme(
-    plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 8)
-  )
-
-p2 <- dotplot(GO_enrich_down150_KEGG, showCategory = 20) + 
-  ggtitle("GO Enrichment KEGG for DOWNregulated targets for vesicles 150") + 
-  theme(
-    plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 8)
-  )
-
-p1 + p2
-
-combined_plot <- p1 + p2
-
-ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_KEGG_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
-```
-
-**Анализ обогащения из базы CP:WIKIPATHWAYS**
-```{r}
-msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:WIKIPATHWAYS")
-
-GO_enrich_up150_WIKI <- enricher(gene = targets150_up, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
-GO_enrich_down150_WIKI <- enricher(gene = targets150_down, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
-
-p1 <- dotplot(GO_enrich_up150_WIKI, showCategory = 20) + 
-  ggtitle("GO Enrichment WIKIPATHWAYS for UPregulated targets for vesicles 150") + 
-  theme(
-    plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 8)
-  )
-
-p2 <- dotplot(GO_enrich_down150_WIKI, showCategory = 20) + 
-  ggtitle("GO Enrichment WIKIPATHWAYS for DOWNregulated targets for vesicles 150") + 
-  theme(
-    plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 8)
-  )
-
-p1 + p2
-combined_plot <- p1 + p2
-
-ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_WIKIPATHWAY_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
-```
-## Только везикулы типа 16
-```{r}
-coldata_16 <- coldata[coldata$type == 16, ]
-rownames(coldata_16) <- coldata_16$sample
-coldata_16
-```
-```{r}
-common_samples_16 <- intersect(colnames(counts), coldata_16$samples)
-
-counts_16 <- counts[, c(counts$miRNA, common_samples)]  
-counts_16 <- counts_16[, rownames(coldata_16)] #ранжирую по колонки в counts так же как и названия строк в coldata_150
-head(counts_16)
-```
-**Создаем DESeqDataSet из матрицы каунтов**
-```{r}
-dds_16 <- DESeqDataSetFromMatrix(countData = counts_16, 
-                              colData = coldata_16, 
-                              design = ~ 0 + patient + condition)
-dds_16$condition <- relevel(dds_16$condition, ref = "before")
-dds_16
-```
-**Фильтрация**
-```{r}
-dim(dds_16)
-smallestGroupSize <- 3
-keep <- rowSums(counts(dds_16) >= 10) >= smallestGroupSize
-dds_16 <- dds_16[keep,]
-dim(dds_16)
-```
-
-**Run Differential Expression Analysis for 150 type**
-```{r}
-dds_16 <- DESeq(dds_16, fitType = "parametric")
-dds_16
-```
-
-```{r}
-plotDispEsts(dds_16)
-```
-```{r}
-res_16 <- results(dds_16, contrast=c("condition", "before", "after"))
-res_16
+res_cellular <- results(dds, contrast=c("condition", "no_complications", "cellular"))
+res_cellular
 ```
 **MA plot**
 
-Фильтрация точек с низким средним экспрессированием (по baseMean).
-	•	Обычно отсекаются baseMean < 1.
-	2.	Определение значимых генов (синие точки):
-	•	Используется критерий padj < 0.1 по умолчанию, а не < 0.05! 
 ```{r}
-tiff("./pictures/PlotMA_standart_padj_0.05_type16.tiff", 
+tiff("./pictures_transpl/transpl_PlotMA_standart_padj_0.05_cellular.tiff", 
      width = 8, height = 6, units = "in", res = 300, bg = "white")
-plotMA(res_16, alpha = 0.05, ylim = c(-8, 8)) 
+plotMA(res_cellular, alpha = 0.05, ylim = c(-8, 8)) 
 dev.off()
-plotMA(res_16, alpha = 0.05, ylim = c(-8, 8)) 
+plotMA(res_cellular, alpha = 0.05, ylim = c(-8, 8)) 
 ```
-**Кастомный MA plot по p-value**
+
+**Кастомный MA plot**
 ```{r}
-res_df <- res_16 %>%
-  as.data.frame %>%
+res_df <- res_cellular %>%
+  as.data.frame() %>%
   mutate(color = case_when( 
-    pvalue < 0.05 & !is.na(pvalue) & abs(log2FoldChange) > 1  ~ "blue",  # Значимые по p-value и диф экспрессированные
-    TRUE ~ "gray70"
+    padj < 0.05  ~ "padj < 0.05",   
+    pvalue < 0.05  ~ "pvalue < 0.05", 
+    TRUE ~ "All"
   ))
 
 plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
   geom_point(alpha = 0.7, size = 1) +
-  geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +  # Добавляем линию
-  scale_color_manual(values = c("gray70" = "gray70", "blue" = "blue")) +
+  geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +
+  scale_color_manual(values = c("All" = "gray70", 
+                                "pvalue < 0.05" = "blue", 
+                                "padj < 0.05" = "red")) +
   scale_x_log10(labels = scales::scientific) + 
   theme_minimal() +
-  labs(x = "mean of normalized counts", y = "log fold change") +
-  theme(legend.position = "none")
+  labs(x = "mean of normalized counts", 
+       y = "log fold change", 
+       color = NULL)
 
 plt
-ggsave("./pictures_transpl/transpl_PlotMA_castom_pvalue0.05_type16.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_transpl/transpl_Сustom MAplot_cellular.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**БКAПC**
+```{r}
+res_TCAD <- results(dds, contrast=c("condition", "no_complications", "TCAD"))
+res_TCAD
+```
+
+**MA plot**
+```{r}
+tiff("./pictures_transpl/transpl_PlotMA_standart_padj_0.05_TCAD.tiff", 
+     width = 8, height = 6, units = "in", res = 300, bg = "white")
+plotMA(res_TCAD, alpha = 0.05, ylim = c(-8, 8)) 
+dev.off()
+plotMA(res_TCAD, alpha = 0.05, ylim = c(-8, 8)) 
+```
+## Кастомный MA plot
+```{r}
+res_df <- res_TCAD %>%
+  as.data.frame() %>%
+  mutate(color = case_when( 
+    padj < 0.05  ~ "padj < 0.05",   
+    pvalue < 0.05  ~ "pvalue < 0.05", 
+    TRUE ~ "All"
+  ))
+
+plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
+  geom_point(alpha = 0.7, size = 1) +
+  geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +
+  scale_color_manual(values = c("All" = "gray70", 
+                                "pvalue < 0.05" = "blue", 
+                                "padj < 0.05" = "red")) +
+  scale_x_log10(labels = scales::scientific) + 
+  theme_minimal() +
+  labs(x = "mean of normalized counts", 
+       y = "log fold change", 
+       color = NULL)
+
+plt
+ggsave("./pictures_transpl/transpl_Сustom_MAplot_TCAD.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **Значимые результаты**
 ```{r}
-summary(results(dds_16, contrast=c("condition", "before", "after"), alpha=0.05))
-```
-Let's arranged it by log2FoldChange:
-```{r}
-order_indices <- order(-res_16$log2FoldChange)
-res_16[order_indices, ]
-```
-Visualisation for the first gene
-```{r}
-plotCounts(dds_16, gene=which.max(res_16$log2FoldChange), intgroup="condition")
-plotCounts(dds_16, gene=which.min(res_16$pvalue), intgroup="condition")
-#plotCounts(dds, gene=rownames(res)[which.min(res$padj[which.max(res$log2FoldChange)])], intgroup="condition")
+signres_TCAD <- results(dds, contrast=c("condition", "no_complications", "TCAD"), alpha=0.05) 
+summary(signres_TCAD)
 ```
 **Volcano plot**
 ```{r}
-plt <- EnhancedVolcano(res_16,
-                lab = rownames(res_16),
+plt <- EnhancedVolcano(res_TCAD,
+                lab = rownames(res_TCAD),
                 x = "log2FoldChange",
-                y = "pvalue",
+                y = "padj",
                 pCutoff = 0.05,
                 FCcutoff = 1,
                 labSize = 3.0,
@@ -649,183 +536,67 @@ plt <- EnhancedVolcano(res_16,
                 subtitle = NULL) 
 
 plt
-ggsave("./pictures_transpl/transpl_Volcano plot_based_on_Pvalue_16type.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_transpl/transpl_VolcanoPlot_TCAD.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
-**rlog трансформация**
-	•	Черные точки – стандартное отклонение отдельных генов.
-	•	Красная линия – сглаженный тренд зависимости SD от среднего значения экспрессии.
-	•	Если красная линия наклонена вверх → стандартное отклонение растёт с увеличением среднего (плохая нормализация).
-	•	Если красная линия примерно горизонтальна → нормализация сработала хорошо.
+**Анализ обогащения TCAD**
 ```{r}
-rlt_16 <- rlog(dds_16) 
-meanSdPlot(assay(rlt_16))  #показывает, как изменяется стандартное отклонение в зависимости от среднего значения экспрессии.
-```
-```{r}
-pcaData <- plotPCA(rlt_16, intgroup=c("condition", "patient"), returnData = TRUE)
-percentVar <- round(100 * attr(pcaData, "percentVar"))
+res_sign_TCAD <- subset(res_TCAD, padj < 0.05 & !is.na(padj) & abs(log2FoldChange) > 1.0)
 
-ggplot(pcaData, aes(PC1, PC2, shape = patient, color = condition)) +
-  geom_point(size = 3) +
-  xlab(paste0("PC1: ", percentVar[1], "%")) +
-  ylab(paste0("PC2: ", percentVar[2], "%")) + 
-  coord_fixed() +
-  theme_bw() +
-  scale_color_brewer(palette = "Set2")
-```
-```{r}
-assay(rlt_16) <- limma::removeBatchEffect(assay(rlt_16),
-                                       batch = colData(dds_16)[,'patient'])
-
-pcaData <- plotPCA(rlt_16, intgroup=c("condition", "patient"), returnData = TRUE)
-percentVar <- round(100 * attr(pcaData, "percentVar"))
-
-plt <- ggplot(pcaData, aes(PC1, PC2, shape = patient, color = condition)) +
-  geom_point(size = 3) +
-  xlab(paste0("PC1: ", percentVar[1], "%")) +
-  ylab(paste0("PC2: ", percentVar[2], "%")) + 
-  coord_fixed() +
-  theme_bw() +
-  scale_color_brewer(palette = "Set2")
-
-plt
-ggsave("./pictures_transpl/transpl_PCA plot for type 16 after removing donor effect.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-```
-**Plot a heatmap of the most expressed genes**
-```{r}
-res_sign_16 <- subset(res_16, pvalue < 0.05 & !is.na(pvalue) & abs(log2FoldChange) > 1.0)
-res_sign_16 <- res_sign_16[order(res_sign_16$log2FoldChange, decreasing = TRUE), ]
-
-sig_genes <- rownames(res_sign_16)  # Получаем имена генов, которые прошли фильтрацию
-
-de_mat <- assay(rlt_16)[sig_genes, ] 
-datamatrix <- t(scale(t(de_mat)))
-
-annotation_col <- data.frame(condition = coldata_16$condition)
-rownames(annotation_col) <- colnames(datamatrix)
-
-annotation_colors <- list(
-  condition = c("before" = "#FFCC00", "after" = "#3399FF")
-)
-
-plt <- pheatmap(datamatrix, 
-         cluster_rows = TRUE, 
-         show_rownames = TRUE, 
-         cluster_cols = TRUE, 
-         annotation_col = annotation_col,
-         annotation_colors = annotation_colors,
-         display_numbers = TRUE,
-         legend = FALSE,
-         fontsize = 15)  
-
-plt
-ggsave("./pictures_transpl/transpl_Heatmap of diff expressed genes_type16.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-```
-**Plot of the distance between samples heatmap**
-Расчет расстояний между образцами
-	•	Обычно используется евклидово расстояние (по умолчанию в DESeq2).
-	•	Оно вычисляется по нормализованным данным экспрессии (rlog() или vst()).
-	•	Чем меньше расстояние — тем более похожи образцы.
-
-```{r}
-sampleDists_16 <- dist(t(assay(rlt_16)))
-sampleDistMatrix_16 <- as.matrix(sampleDists_16)
-rownames(sampleDistMatrix_16) <- paste(rlt_16$condition, rlt_16$patient, sep="_patient")
-colnames(sampleDistMatrix_16) <- paste(rlt_16$condition, rlt_16$patient, sep="_patient")
-
-plt <- pheatmap(sampleDistMatrix_16,
-         clustering_distance_rows = "euclidean",
-         clustering_distance_cols = "euclidean",
-         fontsize = 12,
-         legend = FALSE,
-         display_numbers = TRUE,
-         color = colors)
-
-plt
-ggsave("./pictures_transpl/transpl_Plot of the distance between samples_type16.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-```
-### Анализ обогащения для везикул типа 16 ###
-```{r}
-up_16 <- res_sign_16 %>% 
+up_TCAD <- res_sign_TCAD %>% 
   as.data.frame() %>% 
   filter(log2FoldChange > 0)
-down_16 <- res_sign_16 %>% 
-  as.data.frame() %>% 
-  filter(log2FoldChange < 0)
-rownames(up_16)
-rownames(down_16)
-```
-Переводим в miRBase
-	•	miRBase: https://www.mirbase.org/
-	•	MirGeneDB: https://mirgenedb.org/
-```{r}
-url <- "https://mirgenedb.org/browse/hsa"
-page <- read_html(url)
-```
 
-Парсим таблицу
-```{r}
-mir_table <- page %>%
-  html_element("table") %>%
-  html_table(fill = TRUE) 
-
-mir_table <- mir_table[-c(1:3), c(1,2) ] 
-colnames(mir_table) <- c("MirGeneDB_ID", "MiRBase_ID")
-mir_table$MirGeneDB_ID <- sub(" V", "", mir_table$MirGeneDB_ID)
-
-head(mir_table)
+rownames(up_TCAD)
 ```
 
 ```{r}
-up_16_clean <- sub("_.*", "", row.names(up_16))
-up_16_converted <- mir_table$MiRBase_ID[match(up_16_clean, mir_table$MirGeneDB_ID)]
-
-#down_16_clean <- sub("_.*", "", row.names(down_16))
-down_16_converted <- mir_table$MiRBase_ID[match(down_16_clean, mir_table$MirGeneDB_ID)]
-up_16_converted
-down_16_converted
+mirna_names_up <- "hsa-miR-582-3p"
+converted_mirna_up <- miRNAVersionConvert(mirna_names_up)
+converted_mirna_up
 ```
-
-**Конвертация в MIMATID** 
-в итоге заменила NA вручную на самые близкие, но это такая себе практика
-
-NA Hsa-Mir-10-P3a_5p  есть два соответствия:
-Hsa-Mir-10-P1c =	hsa-mir-10a
-Hsa-Mir-10-P3b = hsa-mir-125a
-
-NA Hsa-Mir-126_3p* есть одно соответствие: 
-Hsa-Mir-126-P2 = hsa-mir-126 
-
-NA Hsa-Mir-30-P1c_3p* есть три соответствия:
-Hsa-Mir-30-P1a = hsa-mir-30d
-Hsa-Mir-30-P1b = hsa-mir-30a
-Hsa-Mir-30-P1d = hsa-mir-30e
-
-[1] "Hsa-Mir-185_5p"     "Hsa-Mir-197_3p"     "Hsa-Mir-10-P3a_5p"  "Hsa-Mir-148-P3_5p*" "Hsa-Mir-30-P1a_3p*" "Hsa-Mir-150_3p*"   
-[7] "Hsa-Mir-361_3p*"    "Hsa-Mir-10-P2b_5p"  "Hsa-Mir-126_3p*"   
-[1] "Hsa-Mir-340_5p"     "Hsa-Mir-181-P2c_5p" "Hsa-Mir-223_5p*"    "Hsa-Mir-30-P1c_3p*"
-
-MI (MicroRNA Gene ID) — это идентификатор предшественника (precursor) miRNA
-MIMAT (Mature miRNA ID) — это идентификатор зрелой (mature) miRNA, которая функционирует в клетке
+**Запрос таргетов из базы multiMi**
 ```{r}
-up_16_converted <-  c("hsa-mir-185-5p", "hsa-mir-197-3p", "hsa-mir-152-5p", "hsa-mir-30d-3p", "hsa-mir-150-3p", "hsa-mir-361-3p", "hsa-mir-99b-5p", "hsa-mir-126-3p")
-down_16_converted <- c("hsa-mir-340-5p", "hsa-mir-181d-5p", "hsa-mir-223-5p")
-
-# up_16_converted <-  c("hsa-mir-185", "hsa-mir-197", "hsa-mir-152", "hsa-mir-30d", "hsa-mir-150", "hsa-mir-361", "hsa-mir-99b", "hsa-mir-126")
-# down_16_converted <- c("hsa-mir-340", "hsa-mir-181d", "hsa-mir-223") #но есть только MI, а не MIMAT
-
-converted_mirna_up16 <- miRNAVersionConvert(up_16_converted)
-converted_mirna_down16 <- miRNAVersionConvert(down_16_converted)
-converted_mirna_up16
-converted_mirna_down16
+targets_TCAD_up <- unique(get_multimir(org = "hsa", mirna = converted_mirna_down$Accession, table = "validated")@data$target_symbol)
+targets_TCAD_up
 ```
-**Запрос таргетов из базы multiMiR**
+**Анализ обогащения из базы биологических процессов**
 ```{r}
-targets16_up <- unique(get_multimir(org = "hsa", mirna = converted_mirna_up16$Accession, table = "predicted")@data$target_symbol)
-targets16_up
+GO_enrich_up_TCAD_bp <- enrichGO(
+  gene          = targets_TCAD_up,  
+  OrgDb         = org.Hs.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "BP", 
+  pAdjustMethod = "BH",
+  qvalueCutoff  = 0.05
+)
 ```
+**Визуализация**
 ```{r}
-targets16_down <- unique(get_multimir(org = "hsa", mirna = converted_mirna_down16$Accession, table = "predicted")@data$target_symbol)
-targets16_down
+p1 <- dotplot(GO_enrich_up_TCAD_bp, showCategory = 20) + 
+  ggtitle("GO Enrichment for UPregulated targets TCAD") + 
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.y = element_text(size = 11)
+  )
+
+p1
+
+ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_up_TCAD_bp.tiff", plot = p1, width = 16, height = 10, dpi = 300)
 ```
 
+```{r}
+GO_enrich_UP_TCAD_bp <- enrichplot::pairwise_termsim(GO_enrich_up_TCAD_bp, method = "JC")
 
+plt <- emapplot(GO_enrich_UP_TCAD_bp, 
+         repel = TRUE,
+         showCategory = 20) +
+  ggtitle("Biological processes for UPregulated targets for TCAD") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 3)
+    )    
+
+plt
+
+ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_up_TCAD_BP.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
