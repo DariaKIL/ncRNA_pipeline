@@ -292,20 +292,27 @@ plotMA(res_150, alpha = 0.05, ylim = c(-8, 8))
 **Кастомный MA plot по p-value**
 ```{r}
 res_df <- res_150 %>%
-  as.data.frame %>%
+  as.data.frame() %>%
   mutate(color = case_when( 
-    pvalue < 0.05  ~ "blue", # Значимые только по p-value
-    TRUE ~ "gray70"
+    padj < 0.05  ~ "padj < 0.05",   
+    pvalue < 0.05  ~ "pvalue < 0.05", 
+    TRUE ~ "All micro-RNA"
   ))
 
-ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
+plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
   geom_point(alpha = 0.7, size = 1) +
-  geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +  # Добавляем линию
-  scale_color_manual(values = c("gray70" = "gray70", "blue" = "blue")) +
+  geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +
+  scale_color_manual(values = c("All micro-RNA" = "gray70", 
+                                "pvalue < 0.05" = "blue", 
+                                "padj < 0.05" = "red")) +
   scale_x_log10(labels = scales::scientific) + 
   theme_minimal() +
-  labs(x = "mean of normalized counts", y = "log fold change") +
-  theme(legend.position = "none")
+  labs(x = "mean of normalized counts", 
+       y = "log fold change", 
+       color = NULL)  # Название легенды
+
+plt
+ggsave("./pictures/Сustom MAplot_type150.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **Значимые результаты**
 ```{r}
@@ -319,7 +326,7 @@ res_150[order_indices, ]
 ```
 Visualisation for the first gene
 ```{r}
-plotCounts(dds_150, gene=which.max(res_150$log2FoldChange), intgroup="condition")
+#plotCounts(dds_150, gene=which.max(res_150$log2FoldChange), intgroup="condition")
 plotCounts(dds_150, gene=which.min(res_150$padj), intgroup="condition")
 #plotCounts(dds, gene=rownames(res)[which.min(res$padj[which.max(res$log2FoldChange)])], intgroup="condition")
 ```
@@ -384,6 +391,7 @@ plt
 ggsave("./pictures/PCA plot for type 150 after removing donor effect.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **Plot a heatmap of diff expressed genes**
+
 ```{r}
 res_sign_150 <- subset(res_150, padj < 0.05 & !is.na(padj) & abs(log2FoldChange) > 1.0)
 res_sign_150 <- res_sign_150[order(res_sign_150$log2FoldChange, decreasing = TRUE), ]
@@ -391,7 +399,7 @@ res_sign_150 <- res_sign_150[order(res_sign_150$log2FoldChange, decreasing = TRU
 sig_genes <- rownames(res_sign_150)  # Получаем имена генов, которые прошли фильтрацию
 
 de_mat <- assay(rlt_150)[sig_genes, ] 
-datamatrix <- t(scale(t(de_mat)))
+datamatrix <- de_mat
 
 annotation_col <- data.frame(condition = coldata_150$condition)
 rownames(annotation_col) <- colnames(datamatrix)
@@ -407,7 +415,7 @@ plt <- pheatmap(datamatrix,
          annotation_col = annotation_col,
          annotation_colors = annotation_colors,
          display_numbers = TRUE,
-         legend = FALSE,
+         legend = TRUE,
          fontsize = 15)  
 plt
 ggsave("./pictures/Heatmap of diff expressed genes_type150.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
@@ -478,69 +486,55 @@ targets150_up <- unique(get_multimir(org = "hsa", mirna = converted_mirna_down$A
 #writeLines(targets_up, "targets_up150_list.txt")
 ```
 
-**Анализ обогащения из базы биологических процессов**
-```{r}
-#msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "GO:BP")
-# targets_down <- readLines("targets_down150_list.txt")
-# targets_up <- readLines("targets_up150_list.txt")
 
-GO_enrich_down150_bp <- enrichGO(
+**Анализ обогащения, связанный со Biological Process, Cellular Component и Molecular Function**
+
+```{r}
+# msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C7", subcategory = "IMMUNESIGDB")
+# 
+# GO_enrich_up150_immum <- enricher(gene = targets150_up, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
+# GO_enrich_down150_immun <- enricher(gene = targets150_down, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
+
+GO_enrich_down150_all <- enrichGO(
   gene          = targets150_down,  
   OrgDb         = org.Hs.eg.db,
   keyType       = "SYMBOL",
-  ont           = "BP", 
+  ont           = "ALL", 
   pAdjustMethod = "BH",
   qvalueCutoff  = 0.05
 )
 
-GO_enrich_up150_bp <- enrichGO(
+GO_enrich_up150_all <- enrichGO(
   gene          = targets150_up,  
   OrgDb         = org.Hs.eg.db,
   keyType       = "SYMBOL",
-  ont           = "BP", 
+  ont           = "ALL", 
   pAdjustMethod = "BH",
   qvalueCutoff  = 0.05
 )
 ```
 
-**Визуализация**
+**Визуализация Biological Process, Cellular Component и Molecular Function**
 ```{r}
-
-p1 <- dotplot(GO_enrich_down150_bp, showCategory = 20) + 
-  ggtitle("GO Enrichment for DOWNregulated targets") + 
+p1 <- dotplot(GO_enrich_up150_all, showCategory = 20) + 
+  ggtitle("GO Enrichment of All Processes for Upregulated Targets in Vesicles 150") + 
   theme(
     plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 11)
+    axis.text.y = element_text(size = 8)
   )
 
-p2 <- dotplot(GO_enrich_up150_bp, showCategory = 20) + 
-  ggtitle("GO Enrichment for UPregulated targets") + 
+p2 <- dotplot(GO_enrich_down150_all, showCategory = 20) + 
+  ggtitle("GO Enrichment of All Processes for Downregulated Targets in Vesicles 150") + 
   theme(
     plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 11)
+    axis.text.y = element_text(size = 8)
   )
 
-p1 + p2  
+p1 + p2
 
 combined_plot <- p1 + p2
 
-ggsave("./pictures/GO_enrichment_dotplot_BP_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
-```
-```{r}
-GO_enrich_DOWN150_BP <- enrichplot::pairwise_termsim(GO_enrich_down150_bp, method = "JC")
-
-plt <- emapplot(GO_enrich_DOWN150_BP, 
-         repel = TRUE,
-         showCategory = 20) +
-  ggtitle("Biological processes for DOWNregulated targets for vesicles 150") +
-  theme(
-    plot.title = element_text(size = 12, face = "bold"),
-    axis.text = element_text(size = 3)
-    )    
-
-plt
-
-ggsave("./pictures/GO_enrichment_emapplot_BPdown_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+ggsave("./pictures/GO_enrichment_dotplot_all process_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
 ```
 ```{r}
 GO_enrich_UP150_BP <- enrichplot::pairwise_termsim(GO_enrich_up150_bp, method = "JC")
@@ -548,7 +542,7 @@ GO_enrich_UP150_BP <- enrichplot::pairwise_termsim(GO_enrich_up150_bp, method = 
 plt <- emapplot(GO_enrich_UP150_BP, 
          repel = TRUE,
          showCategory = 20) +
-  ggtitle("Biological processes for UPregulated targets for vesicles 150") +
+  ggtitle("All processes for UPregulated targets for vesicles 150") +
   theme(
     plot.title = element_text(size = 12, face = "bold"),
     axis.text = element_text(size = 3)
@@ -556,96 +550,181 @@ plt <- emapplot(GO_enrich_UP150_BP,
 
 plt
 
-ggsave("./pictures/GO_enrichment_emapplot_BPup_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
-```
-**Анализ обогащения из базы IMMUNESIGDB**
-IMMUNESIGDB: Наборы генов, связанные с иммунной системой, включая иммуно-онкологию и другие аспекты иммунитета.
-```{r}
-msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C7", subcategory = "IMMUNESIGDB")
-
-GO_enrich_up150_immum <- enricher(gene = targets150_up, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
-GO_enrich_down150_immun <- enricher(gene = targets150_down, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
+ggsave("./pictures/GO_enrichment_emapplot_ALL_up_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
 
-**Визуализация IMMUNESIGDB**
 ```{r}
+GO_enrich_DOWN150_all <- enrichplot::pairwise_termsim(GO_enrich_down150_all, method = "JC")
 
-p1 <- dotplot(GO_enrich_up150_immum, showCategory = 20) + 
-  ggtitle("GO Enrichment IMMUNESIGD for UPregulated targets for vesicles 150") + 
+plt <- emapplot(GO_enrich_DOWN150_all, 
+         repel = TRUE,
+         showCategory = 20) +
+  ggtitle("All processes for DOWNregulated targets for vesicles 150") +
   theme(
     plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 8)
+    axis.text = element_text(size = 3)
+    )    
+
+plt
+
+ggsave("./pictures/GO_enrichment_emapplot_ALL_down_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+
+**GO Enrichment of Cellular Component**
+```{r}
+# msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C7", subcategory = "IMMUNESIGDB")
+# 
+# GO_enrich_up150_immum <- enricher(gene = targets150_up, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
+# GO_enrich_down150_immun <- enricher(gene = targets150_down, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
+
+GO_enrich_down150_CC <- enrichGO(
+  gene          = targets150_down,  
+  OrgDb         = org.Hs.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "CC", 
+  pAdjustMethod = "BH",
+  qvalueCutoff  = 0.05
+)
+
+GO_enrich_up150_CC <- enrichGO(
+  gene          = targets150_up,  
+  OrgDb         = org.Hs.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "CC", 
+  pAdjustMethod = "BH",
+  qvalueCutoff  = 0.05
+)
+```
+
+
+```{r}
+p1 <- dotplot(GO_enrich_up150_CC, showCategory = 20) + 
+  ggtitle("GO Enrichment of Cellular Component for Upregulated Targets in Vesicles 150") + 
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.y = element_text(size = 12)
   )
 
-p2 <- dotplot(GO_enrich_down150_immun, showCategory = 20) + 
-  ggtitle("GO Enrichment IMMUNESIGD for DOWNregulated targets for vesicles 150") + 
+p2 <- dotplot(GO_enrich_down150_CC, showCategory = 20) + 
+  ggtitle("GO Enrichment of Cellular Component for Downregulated Targets in Vesicles 150") + 
   theme(
     plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 8)
+    axis.text.y = element_text(size = 12)
   )
 
 p1 + p2
 
 combined_plot <- p1 + p2
 
-ggsave("./pictures/GO_enrichment_dotplot_IMMUNESIGD_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
+ggsave("./pictures/GO_enrichment_dotplot_CC_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
 ```
 
-
-**Анализ обогащения из базы KEGG**
 ```{r}
-msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG")
+GO_enrich_UP150_CC <- enrichplot::pairwise_termsim(GO_enrich_up150_CC, method = "JC")
 
-GO_enrich_up150_KEGG <- enricher(gene = targets150_up, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
-GO_enrich_down150_KEGG <- enricher(gene = targets150_down, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
-
-p1 <- dotplot(GO_enrich_up150_KEGG, showCategory = 20) + 
-  ggtitle("GO Enrichment KEGG for UPregulated targets for vesicles 150") + 
+plt <- emapplot(GO_enrich_UP150_CC, 
+         repel = TRUE,
+         showCategory = 20) +
+  ggtitle("All processes for UPregulated targets for vesicles 150") +
   theme(
     plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 8)
+    axis.text = element_text(size = 3)
+    )   
+
+plt
+
+ggsave("./pictures/GO_enrichment_emapplot_CC_up_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+```{r}
+GO_enrich_DOWN150_CC <- enrichplot::pairwise_termsim(GO_enrich_down150_CC, method = "JC")
+
+plt <- emapplot(GO_enrich_DOWN150_CC, 
+         repel = TRUE,
+         showCategory = 25) +
+  ggtitle("All processes for DOWNregulated targets for vesicles 150") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 3)
+    )    
+
+plt
+
+ggsave("./pictures/GO_enrichment_emapplot_CC_down_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+
+**GO Enrichment of Molecular Function**
+```{r}
+GO_enrich_down150_MF <- enrichGO(
+  gene          = targets150_down,  
+  OrgDb         = org.Hs.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "MF", 
+  pAdjustMethod = "BH",
+  qvalueCutoff  = 0.05
+)
+
+GO_enrich_up150_MF <- enrichGO(
+  gene          = targets150_up,  
+  OrgDb         = org.Hs.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "MF", 
+  pAdjustMethod = "BH",
+  qvalueCutoff  = 0.05
+)
+
+p1 <- dotplot(GO_enrich_up150_MF, showCategory = 20) + 
+  ggtitle("GO Enrichment of Molecular Function for Upregulated Targets in Vesicles 150") + 
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.y = element_text(size = 12)
   )
 
-p2 <- dotplot(GO_enrich_down150_KEGG, showCategory = 20) + 
-  ggtitle("GO Enrichment KEGG for DOWNregulated targets for vesicles 150") + 
+p2 <- dotplot(GO_enrich_down150_MF, showCategory = 20) + 
+  ggtitle("GO Enrichment of Molecular Functiont for Downregulated Targets in Vesicles 150") + 
   theme(
     plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 8)
+    axis.text.y = element_text(size = 12)
   )
 
 p1 + p2
 
 combined_plot <- p1 + p2
 
-ggsave("./pictures/GO_enrichment_dotplot_KEGG_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
+ggsave("./pictures/GO_enrichment_dotplot_MF_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
 ```
-
-**Анализ обогащения из базы CP:WIKIPATHWAYS**
 ```{r}
-msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:WIKIPATHWAYS")
+GO_enrich_UP150_MF <- enrichplot::pairwise_termsim(GO_enrich_up150_MF, method = "JC")
 
-GO_enrich_up150_WIKI <- enricher(gene = targets150_up, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
-GO_enrich_down150_WIKI <- enricher(gene = targets150_down, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
-
-p1 <- dotplot(GO_enrich_up150_WIKI, showCategory = 20) + 
-  ggtitle("GO Enrichment WIKIPATHWAYS for UPregulated targets for vesicles 150") + 
+plt <- emapplot(GO_enrich_UP150_MF, 
+         repel = TRUE,
+         showCategory = 25) +
+  ggtitle("Molecular Function processes for UPregulated targets for vesicles 150") +
   theme(
     plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 8)
-  )
+    axis.text = element_text(size = 3)
+    )   
 
-p2 <- dotplot(GO_enrich_down150_WIKI, showCategory = 20) + 
-  ggtitle("GO Enrichment WIKIPATHWAYS for DOWNregulated targets for vesicles 150") + 
-  theme(
-    plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 8)
-  )
+plt
 
-combined_plot <- p1 + p2
-combined_plot
-
-ggsave("./pictures/GO_enrichment_dotplot_WIKIPATHWAY_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
+ggsave("./pictures/GO_enrichment_emapplot_MF_up_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
+```{r}
+GO_enrich_DOWN150_MF <- enrichplot::pairwise_termsim(GO_enrich_down150_MF, method = "JC")
+
+plt <- emapplot(GO_enrich_DOWN150_MF, 
+         repel = TRUE,
+         showCategory = 25) +
+  ggtitle("Molecular Function processes for DOWNregulated targets for vesicles 150") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 3)
+    )   
+
+plt
+
+ggsave("./pictures/GO_enrichment_emapplot_MF_down_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+
 ### Только везикулы типа 16 ###
 ```{r}
 coldata_16 <- coldata[coldata$type == 16, ]
@@ -733,7 +812,7 @@ res_16[order_indices, ]
 ```
 Visualisation for the first gene
 ```{r}
-plotCounts(dds_16, gene=which.max(res_16$log2FoldChange), intgroup="condition")
+#plotCounts(dds_16, gene=which.max(res_16$log2FoldChange), intgroup="condition")
 plotCounts(dds_16, gene=which.min(res_16$pvalue), intgroup="condition")
 #plotCounts(dds, gene=rownames(res)[which.min(res$padj[which.max(res$log2FoldChange)])], intgroup="condition")
 ```
@@ -795,6 +874,7 @@ plt
 ggsave("./pictures/PCA plot for type 16 after removing donor effect.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **Plot a heatmap of the most expressed genes**
+
 ```{r}
 res_sign_16 <- subset(res_16, pvalue < 0.05 & !is.na(pvalue) & abs(log2FoldChange) > 1.0)
 res_sign_16 <- res_sign_16[order(res_sign_16$log2FoldChange, decreasing = TRUE), ]
@@ -802,7 +882,8 @@ res_sign_16 <- res_sign_16[order(res_sign_16$log2FoldChange, decreasing = TRUE),
 sig_genes <- rownames(res_sign_16)  # Получаем имена генов, которые прошли фильтрацию
 
 de_mat <- assay(rlt_16)[sig_genes, ] 
-datamatrix <- t(scale(t(de_mat)))
+datamatrix <- de_mat
+#datamatrix <- t(scale(t(de_mat)))
 
 annotation_col <- data.frame(condition = coldata_16$condition)
 rownames(annotation_col) <- colnames(datamatrix)

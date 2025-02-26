@@ -71,7 +71,7 @@ plt <- ggplot(anno_long, aes(x = Sample.name.s., y = Count, fill = RNA_Type)) +
   scale_fill_brewer(palette = "Set3")  # Красивые цвета
 
 print(plt)
-ggsave("./pictures/barplot_alldataset_no_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300,  bg = "white")
+ggsave("./pictures_transpl/transpl_barplot_alldataset_no_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300,  bg = "white")
 ```
 
 ```{r}
@@ -89,7 +89,7 @@ plt <- ggplot(anno_long, aes(x = Sample.name.s., y = Proportion, fill = RNA_Type
   scale_fill_brewer(palette = "Set3")
 
 plt
-ggsave("./pictures/barplot_alldataset_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_transpl/transpl_barplot_alldataset_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 ```{r}
 coldata$condition <- relevel(factor(coldata$condition), ref = "no_complications")
@@ -101,15 +101,13 @@ ncol(modelMatrix)
 
 
 ```{r}
-dds <- DESeqDataSetFromMatrix(countData = counts, 
-                              colData = coldata, 
-                              design = ~type*condition + patient)
-dds$condition <- relevel(dds$condition, ref = "before")
+dds <- DESeqDataSetFromMatrix(countData = counts, colData = coldata, design = ~ condition)
+dds$condition <- relevel(dds$condition, ref = "no_complications")
 dds
 ```
 ```{r}
 dim(dds)
-smallestGroupSize <- 3
+smallestGroupSize <- 15
 keep <- rowSums(counts(dds) >= 10) >= smallestGroupSize
 dds <- dds[keep,]
 dim(dds)
@@ -140,7 +138,7 @@ plt <- ggplot(df, aes(x = Sample, y = Counts, fill = Type)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 plt
-ggsave("./pictures/Counts before and after normalization.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_transpl/transpl_Counts before and after normalization.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 rlog трансформация
 ```{r}
@@ -155,48 +153,33 @@ meanSdPlot(assay(vsd)) #показывает, как изменяется ста
 
 ** PCA plot **
 ```{r}
-pcaData <- plotPCA(rlt, intgroup=c("condition", "type", "patient"), returnData = TRUE)
+pcaData <- plotPCA(rlt, intgroup=c("condition"), returnData = TRUE)
 percentVar <- round(100 * attr(pcaData, "percentVar"))
 
-pcaData$condition_type <- paste(pcaData$condition, pcaData$type, sep = "_")
+coldata$sample <- gsub("_.*", "", coldata$sample)
+pcaData$sample <- coldata$sample
 
-ggplot(pcaData, aes(PC1, PC2, shape = patient, color = condition_type)) +
-  geom_point(size = 3) +
-  xlab(paste0("PC1: ", percentVar[1], "%")) +
-  ylab(paste0("PC2: ", percentVar[2], "%")) + 
-  coord_fixed() +
-  theme_bw() +
-  ggtitle("PCA plot for all dataset before removing donor effect")+
-  scale_color_brewer(palette = "Set2")
-```
-```{r}
-assay(rlt) <- limma::removeBatchEffect(assay(rlt),
-                                       batch = colData(dds)[,'patient'])
-
-pcaData <- plotPCA(rlt, intgroup=c("condition", "type", "patient"), returnData = TRUE)
-percentVar <- round(100 * attr(pcaData, "percentVar"))
-
-pcaData$condition_type <- paste(pcaData$condition, pcaData$type, sep = "_")
-
-plt <- ggplot(pcaData, aes(PC1, PC2, shape = patient, color = condition_type)) +
+plt <- ggplot(pcaData, aes(PC1, PC2, color = condition)) +
+  geom_text(aes(label=sample), size=3, vjust=1.5) +
   geom_point(size = 3) +
   xlab(paste0("PC1: ", percentVar[1], "%")) +
   ylab(paste0("PC2: ", percentVar[2], "%")) + 
   coord_fixed() +
   theme_bw() +
   scale_color_brewer(palette = "Set2")
-
 plt
-ggsave("./pictures/PCA plot for all dataset after removing donor effect.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_transpl/transpl_PCA plot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
+
 **Plot a heatmap of 50 most expressed genes**
 Этот heatmap отражает уровни экспрессии генов, а не разницу между группами.
 Цвета не означают up- или down-регуляцию в сравнении с контрольной группой, потому что heatmap показывает абсолютные значения экспрессии, а не fold change!
 ```{r}
 select <- order(rowMeans(counts(dds,normalized=TRUE)),
                 decreasing=TRUE)[1:50]
-df <- as.data.frame(colData(dds)[,c("type", "condition")])
-
+df <- as.data.frame(colData(dds)$condition)
+colnames(df) <- "condition"
+rownames(df) <- colnames(counts(dds))
 plt <- pheatmap(assay(rlt)[select,], 
          cluster_rows = TRUE, 
          show_rownames = TRUE, 
@@ -205,7 +188,7 @@ plt <- pheatmap(assay(rlt)[select,],
          fontsize_row = 6) 
 
 plt
-ggsave("./pictures/Plot a heatmap of 50 most expressed genes.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_transpl/transpl_Plot a heatmap of 50 most expressed genes.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **Plot of the distance between samples heatmap**
 Расчет расстояний между образцами
@@ -215,8 +198,8 @@ ggsave("./pictures/Plot a heatmap of 50 most expressed genes.tiff", plot = plt, 
 ```{r}
 sampleDists <- dist(t(assay(rlt)))
 sampleDistMatrix <- as.matrix(sampleDists)
-rownames(sampleDistMatrix) <- paste(rlt$condition, rlt$type, sep="_type")
-colnames(sampleDistMatrix) <- paste(rlt$condition, rlt$type, sep="_type")
+rownames(sampleDistMatrix) <- paste(rlt$condition)
+colnames(sampleDistMatrix) <- paste(rlt$condition)
 colors <- colorRampPalette(rev(brewer.pal(9, "Blues")) )(255)
 
 plt <- pheatmap(sampleDistMatrix,
@@ -225,108 +208,73 @@ plt <- pheatmap(sampleDistMatrix,
          color = colors)
 
 plt
-ggsave("./pictures/Plot of the distance between samples heatmap.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-```
-
-## Только везикулы типа 150
-```{r}
-coldata_150 <- coldata[coldata$type == 150, ]
-rownames(coldata_150) <- coldata_150$sample
-coldata_150
+ggsave("./pictures_transpl/transpl_Plot of the distance between samples heatmap.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 ```{r}
-common_samples_150 <- intersect(colnames(counts), coldata_150$samples)
-
-counts_150 <- counts[, c(counts$miRNA, common_samples)]  
-counts_150 <- counts_150[, rownames(coldata_150)] #ранжирую по колонки в counts так же как и названия строк в coldata_150
-head(counts_150)
-```
-```{r}
-coldata_150$condition <- relevel(factor(coldata_150$condition), ref = "before")
-modelMatrix <- model.matrix(~ 0 + patient + condition , coldata)
-modelMatrix
-```
-**Создаем DESeqDataSet из матрицы каунтов**
-```{r}
-dds_150 <- DESeqDataSetFromMatrix(countData = counts_150, 
-                              colData = coldata_150, 
-                              design = ~ 0 + patient + condition)
-dds_150$condition <- relevel(dds_150$condition, ref = "before")
-dds_150
-```
-**Фильтрация**
-```{r}
-dim(dds_150)
-smallestGroupSize <- 3
-keep <- rowSums(counts(dds_150) >= 10) >= smallestGroupSize
-dds_150 <- dds_150[keep,]
-dim(dds_150)
-```
-
-**Run Differential Expression Analysis for 150 type**
-```{r}
-dds_150 <- DESeq(dds_150, fitType = "parametric")
-dds_150
-```
-
-```{r}
-plotDispEsts(dds_150)
-```
-```{r}
-res_150 <- results(dds_150, contrast=c("condition", "before", "after"))
-res_150
+res_humoral <- results(dds, contrast=c("condition", "no_complications", "humoral"))
+res_humoral
 ```
 **MA plot**
-
 Фильтрация точек с низким средним экспрессированием (по baseMean).
 	•	Обычно отсекаются baseMean < 1.
 	2.	Определение значимых генов (синие точки):
 	•	Используется критерий padj < 0.1 по умолчанию, а не < 0.05! 
 ```{r}
-tiff("./pictures/PlotMA_standart_padj_0.05_type150.tiff", 
+tiff("./pictures_transpl/transpl_PlotMA_standart_padj_0.05_humoral.tiff", 
      width = 8, height = 6, units = "in", res = 300, bg = "white")
-plotMA(res_16, alpha = 0.05, ylim = c(-8, 8)) 
+plotMA(res_humoral, alpha = 0.05, ylim = c(-8, 8)) 
 dev.off()
-plotMA(res_16, alpha = 0.05, ylim = c(-8, 8)) 
+plotMA(res_humoral, alpha = 0.05, ylim = c(-8, 8)) 
 ```
-**Кастомный MA plot по p-value**
+**Кастомный MA plot**
 ```{r}
-res_df <- res_150 %>%
-  as.data.frame %>%
+res_df <- res_humoral %>%
+  as.data.frame() %>%
   mutate(color = case_when( 
-    pvalue < 0.05  ~ "blue", # Значимые только по p-value
-    TRUE ~ "gray70"
+    padj < 0.05  ~ "padj < 0.05",   
+    pvalue < 0.05  ~ "pvalue < 0.05", 
+    TRUE ~ "All"
   ))
 
-ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
+plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
   geom_point(alpha = 0.7, size = 1) +
-  geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +  # Добавляем линию
-  scale_color_manual(values = c("gray70" = "gray70", "blue" = "blue")) +
+  geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +
+  scale_color_manual(values = c("All" = "gray70", 
+                                "pvalue < 0.05" = "blue", 
+                                "padj < 0.05" = "red")) +
   scale_x_log10(labels = scales::scientific) + 
   theme_minimal() +
-  labs(x = "mean of normalized counts", y = "log fold change") +
-  theme(legend.position = "none")
+  labs(x = "mean of normalized counts", 
+       y = "log fold change", 
+       color = NULL)
+
+plt
+ggsave("./pictures_transpl/transpl_Сustom MAplot_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
+
 **Значимые результаты**
+
+58 генов (20%) имеют низкие уровни экспрессии и фильтруются из анализа.
+independent filtering — процедура, которая исключает гены с низкими значениями для увеличения статистической мощности.
 ```{r}
-signres_150 <- results(dds_150, contrast=c("condition", "before", "after"), alpha=0.05) 
-summary(signres_150)
+signres_humoral <- results(dds, contrast=c("condition", "no_complications", "humoral"), alpha=0.05) 
+summary(signres_humoral)
 ```
 Let's arranged it by log2FoldChange:
 ```{r}
-order_indices <- order(-res_150$log2FoldChange)
-res_150[order_indices, ]
+order_indices <- order(-res_humoral$log2FoldChange)
+res_humoral[order_indices, ]
 ```
 Visualisation for the first gene
 ```{r}
-plotCounts(dds_150, gene=which.max(res_150$log2FoldChange), intgroup="condition")
-plotCounts(dds_150, gene=which.min(res_150$padj), intgroup="condition")
+plotCounts(dds, gene=which.max(res_humoral$log2FoldChange), intgroup="condition")
+plotCounts(dds, gene=which.min(res_humoral$padj), intgroup="condition")
 #plotCounts(dds, gene=rownames(res)[which.min(res$padj[which.max(res$log2FoldChange)])], intgroup="condition")
 ```
 **Volcano plot**
 ```{r}
-plt <- EnhancedVolcano(res_150,
-                lab = rownames(res_150),
+plt <- EnhancedVolcano(res_humoral,
+                lab = rownames(res_humoral),
                 x = "log2FoldChange",
                 y = "padj",
                 pCutoff = 0.05,
@@ -339,68 +287,30 @@ plt <- EnhancedVolcano(res_150,
                 subtitle = NULL) 
 
 plt
-ggsave("./pictures/Volcano plot_150type.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_transpl/transpl_VolcanoPlot_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
-**rlog трансформация**
-	•	Черные точки – стандартное отклонение отдельных генов.
-	•	Красная линия – сглаженный тренд зависимости SD от среднего значения экспрессии.
-	•	Если красная линия наклонена вверх → стандартное отклонение растёт с увеличением среднего (плохая нормализация).
-	•	Если красная линия примерно горизонтальна → нормализация сработала хорошо.
-```{r}
-rlt_150 <- rlog(dds_150) 
-meanSdPlot(assay(rlt_150))  #показывает, как изменяется стандартное отклонение в зависимости от среднего значения экспрессии.
-```
-**PCA plot**
-PCA – это метод снижения размерности, который показывает различия между образцами. Строится на основе различий в экспрессии по всем генам, даже если они не являются значимо дифференциально экспрессированными.
-	•	Оно не накладывает статистических порогов вроде padj < 0.05 или |log2FoldChange| > 1, а просто ищет наибольшие источники вариабельности среди всех измерений.
-	•	Поэтому даже небольшие изменения экспрессии могут формировать кластеры и различать группы в PCA, если эти изменения систематичны между образцами.
-```{r}
-pcaData <- plotPCA(rlt_150, intgroup=c("condition", "patient"), returnData = TRUE)
-percentVar <- round(100 * attr(pcaData, "percentVar"))
 
-ggplot(pcaData, aes(PC1, PC2, shape = patient, color = condition)) +
-  geom_point(size = 3) +
-  xlab(paste0("PC1: ", percentVar[1], "%")) +
-  ylab(paste0("PC2: ", percentVar[2], "%")) + 
-  coord_fixed() +
-  theme_bw() +
-  scale_color_brewer(palette = "Set2")
-```
-```{r}
-assay(rlt_150) <- limma::removeBatchEffect(assay(rlt_150),
-                                       batch = colData(dds_150)[,'patient'])
-
-pcaData <- plotPCA(rlt_150, intgroup=c("condition", "patient"), returnData = TRUE)
-percentVar <- round(100 * attr(pcaData, "percentVar"))
-
-plt <- ggplot(pcaData, aes(PC1, PC2, shape = patient, color = condition)) +
-  geom_point(size = 3) +
-  xlab(paste0("PC1: ", percentVar[1], "%")) +
-  ylab(paste0("PC2: ", percentVar[2], "%")) + 
-  coord_fixed() +
-  theme_bw() +
-  scale_color_brewer(palette = "Set2")
-plt
-ggsave("./pictures/PCA plot for type 150 after removing donor effect.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-```
 **Plot a heatmap of diff expressed genes**
 ```{r}
-res_sign_150 <- subset(res_150, padj < 0.05 & !is.na(padj) & abs(log2FoldChange) > 1.0)
-res_sign_150 <- res_sign_150[order(res_sign_150$log2FoldChange, decreasing = TRUE), ]
+res_sign_humoral <- subset(res_humoral, padj < 0.05 & !is.na(padj) & abs(log2FoldChange) > 1.0)
+res_sign_humoral <- res_sign_humoral[order(res_sign_humoral$log2FoldChange, decreasing = TRUE), ]
 
-sig_genes <- rownames(res_sign_150)  # Получаем имена генов, которые прошли фильтрацию
+sig_genes <- rownames(res_sign_humoral)  # Получаем имена генов, которые прошли фильтрацию
 
-de_mat <- assay(rlt_150)[sig_genes, ] 
+de_mat <- assay(rlt)[sig_genes, ] 
 datamatrix <- t(scale(t(de_mat)))
 
-annotation_col <- data.frame(condition = coldata_150$condition)
+annotation_col <- data.frame(condition = coldata$condition)
 rownames(annotation_col) <- colnames(datamatrix)
 
-annotation_colors <- list(
-  condition = c("before" = "#FFCC00", "after" = "#3399FF")
-)
+# coldata_humoral <- coldata[coldata$type == 150, ]
+# rownames(coldata_150) <- coldata_150$sample
+# coldata_150
 
-plt <- pheatmap(datamatrix, 
+annotation_colors <- list(
+  condition = c("no_complications" = "#FFCC00", "humoral" = "#3399FF", "cellular" = "green", "TCAD" = "red")
+
+pheatmap(datamatrix,
          cluster_rows = TRUE, 
          show_rownames = TRUE, 
          cluster_cols = TRUE, 
@@ -409,55 +319,27 @@ plt <- pheatmap(datamatrix,
          display_numbers = TRUE,
          legend = FALSE,
          fontsize = 15)  
-plt
-ggsave("./pictures/Heatmap of diff expressed genes_type150.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-```
-**Plot of the distance between samples heatmap**
-Расчет расстояний между образцами
-	•	Обычно используется евклидово расстояние (по умолчанию в DESeq2).
-	•	Оно вычисляется по нормализованным данным экспрессии (rlog() или vst()).
-	•	Чем меньше расстояние — тем более похожи образцы.
 
-```{r}
-sampleDists_150 <- dist(t(assay(rlt_150)))
-sampleDistMatrix_150 <- as.matrix(sampleDists_150)
-rownames(sampleDistMatrix_150) <- paste(rlt_150$condition, rlt_150$patient, sep="_patient")
-colnames(sampleDistMatrix_150) <- paste(rlt_150$condition, rlt_150$patient, sep="_patient")
-
-plt <- pheatmap(sampleDistMatrix_150,
-         clustering_distance_rows = "euclidean",
-         clustering_distance_cols = "euclidean",
-         fontsize = 12,
-         legend = FALSE,
-         display_numbers = TRUE,
-         color = colors)
-plt
-ggsave("./pictures/Plot of the distance between samples_type150.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+# ggsave("./pictures_transpl/transpl_Heatmap of diff expressed genes_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 
-### Анализ обогащения для везикул типа 150 ###
+
+### Анализ обогащения гуморальный ответ ###
 ```{r}
-up_150 <- res_sign_150 %>% 
+up_humoral <- res_sign_humoral %>% 
   as.data.frame() %>% 
   filter(log2FoldChange > 0)
-down_150 <- res_sign_150 %>% 
+down_humoral <- res_sign_humoral %>% 
   as.data.frame() %>% 
   filter(log2FoldChange < 0)
-rownames(up_150)
-rownames(down_150)
+rownames(up_humoral)
+rownames(down_humoral)
 ```
 перевела вручную: https://mirgenedb.org/browse/hsa
-Hsa-Mir-328 =	hsa-mir-328 	Eutheria  — клада зверей, включающая плацентарных и различные вымершие инфраклассы. Эутерии. жираф, крылан, ёж, лев.
-Hsa-Mir-133-P1 = hsa-mir-133a-1 Gnathostomata 
-Hsa-Mir-133-P2 = hsa-mir-133b Gnathostomata
-Hsa-Mir-133-P3 = hsa-mir-133a-2 Gnathostomata
-есть только hsa-miR-133a-3p
-Hsa-Mir-499	= hsa-mir-499a Vertebrata
-Hsa-Mir-208-P2	hsa-mir-208a Vertebrata
+
 	•	miRBase: https://www.mirbase.org/
 	•	MirGeneDB: https://mirgenedb.org/
 ```{r}
-mirna_names_up <- c("hsa-miR-328-3p")
 mirna_names_down <- c("hsa-miR-133a-3p", "hsa-miR-133a-3p", "hsa-miR-208a-3p", "hsa-miR-499a-5p")
 ```
 
@@ -523,7 +405,7 @@ p1 + p2
 
 combined_plot <- p1 + p2
 
-ggsave("./pictures/GO_enrichment_dotplot_BP_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
+ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_BP_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
 ```
 ```{r}
 GO_enrich_DOWN150_BP <- enrichplot::pairwise_termsim(GO_enrich_down150_bp, method = "JC")
@@ -539,7 +421,7 @@ plt <- emapplot(GO_enrich_DOWN150_BP,
 
 plt
 
-ggsave("./pictures/GO_enrichment_emapplot_BPdown_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_BPdown_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
 ```{r}
 GO_enrich_UP150_BP <- enrichplot::pairwise_termsim(GO_enrich_up150_bp, method = "JC")
@@ -555,7 +437,7 @@ plt <- emapplot(GO_enrich_UP150_BP,
 
 plt
 
-ggsave("./pictures/GO_enrichment_emapplot_BPup_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_BPup_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
 **Анализ обогащения из базы IMMUNESIGDB**
 IMMUNESIGDB: Наборы генов, связанные с иммунной системой, включая иммуно-онкологию и другие аспекты иммунитета.
@@ -587,7 +469,7 @@ p1 + p2
 
 combined_plot <- p1 + p2
 
-ggsave("./pictures/GO_enrichment_dotplot_IMMUNESIGD_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
+ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_IMMUNESIGD_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
 ```
 
 
@@ -616,7 +498,7 @@ p1 + p2
 
 combined_plot <- p1 + p2
 
-ggsave("./pictures/GO_enrichment_dotplot_KEGG_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
+ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_KEGG_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
 ```
 
 **Анализ обогащения из базы CP:WIKIPATHWAYS**
@@ -643,7 +525,7 @@ p2 <- dotplot(GO_enrich_down150_WIKI, showCategory = 20) +
 p1 + p2
 combined_plot <- p1 + p2
 
-ggsave("./pictures/GO_enrichment_dotplot_WIKIPATHWAY_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
+ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_WIKIPATHWAY_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
 ```
 ## Только везикулы типа 16
 ```{r}
@@ -720,7 +602,7 @@ plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
   theme(legend.position = "none")
 
 plt
-ggsave("./pictures/PlotMA_castom_pvalue0.05_type16.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_transpl/transpl_PlotMA_castom_pvalue0.05_type16.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **Значимые результаты**
 ```{r}
@@ -753,7 +635,7 @@ plt <- EnhancedVolcano(res_16,
                 subtitle = NULL) 
 
 plt
-ggsave("./pictures/Volcano plot_based_on_Pvalue_16type.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_transpl/transpl_Volcano plot_based_on_Pvalue_16type.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **rlog трансформация**
 	•	Черные точки – стандартное отклонение отдельных генов.
@@ -792,7 +674,7 @@ plt <- ggplot(pcaData, aes(PC1, PC2, shape = patient, color = condition)) +
   scale_color_brewer(palette = "Set2")
 
 plt
-ggsave("./pictures/PCA plot for type 16 after removing donor effect.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_transpl/transpl_PCA plot for type 16 after removing donor effect.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **Plot a heatmap of the most expressed genes**
 ```{r}
@@ -822,7 +704,7 @@ plt <- pheatmap(datamatrix,
          fontsize = 15)  
 
 plt
-ggsave("./pictures/Heatmap of diff expressed genes_type16.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_transpl/transpl_Heatmap of diff expressed genes_type16.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **Plot of the distance between samples heatmap**
 Расчет расстояний между образцами
@@ -845,7 +727,7 @@ plt <- pheatmap(sampleDistMatrix_16,
          color = colors)
 
 plt
-ggsave("./pictures/Plot of the distance between samples_type16.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_transpl/transpl_Plot of the distance between samples_type16.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 ### Анализ обогащения для везикул типа 16 ###
 ```{r}
