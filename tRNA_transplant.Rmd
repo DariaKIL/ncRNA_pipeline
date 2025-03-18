@@ -1,0 +1,445 @@
+---
+title: "micro-RNA Heart Transplantation"
+output:
+  html_notebook: default
+---
+**Устанавливаем необходимые библиотки**
+```{r}
+library(tidyverse)
+library(DESeq2)
+library(pheatmap)
+library(RColorBrewer)
+library(clusterProfiler)
+library(biomaRt)
+library(org.Hs.eg.db)
+library(EnhancedVolcano)
+library(GenomicRanges)
+library(msigdbr)
+library(multiMiR)
+library(miRBaseConverter)
+library(enrichplot)
+library(vsn)
+library(rvest)
+library(patchwork)
+library(dbplyr)
+```
+## Импортируем данные
+```{r}
+coldata <- read_tsv("data/phenotable.tsv", show_col_types = FALSE)
+rownames(coldata) <- coldata$sample
+coldata
+```
+
+```{r}
+counts <- read.csv("data/tRF.Counts.csv", header = TRUE, sep = ",")
+counts <- column_to_rownames(counts, var = "entry.name")
+head(counts)
+```
+```{r}
+colnames(counts) <- gsub("^X", "", colnames(counts))
+
+counts_samples <- colnames(counts)
+phenotable_samples <- coldata$sample
+common_samples <- intersect(counts_samples, phenotable_samples)
+
+counts <- counts[, c(counts$miRNA, common_samples)]  
+counts <- counts[, rownames(coldata)] #ранжирую по колонки в counts так же как и названия строк в coldata
+head(counts)
+```
+
+```{r}
+coldata$condition <- relevel(factor(coldata$condition), ref = "no_complications")
+modelMatrix <- model.matrix(~condition, coldata)
+modelMatrix
+qr(modelMatrix)$rank  # ранг матрицы
+ncol(modelMatrix) 
+```
+
+
+```{r}
+dds <- DESeqDataSetFromMatrix(countData = counts, colData = coldata, design = ~ condition)
+dds$condition <- relevel(dds$condition, ref = "no_complications")
+dds
+```
+```{r}
+dim(dds)
+smallestGroupSize <- 3
+keep <- rowSums(counts(dds) >= 10) >= smallestGroupSize
+dds <- dds[keep,]
+dim(dds)
+```
+###  Run Differential Expression Analysis ###
+```{r}
+dds <- DESeq(dds, fitType = "parametric")
+dds
+```
+
+```{r}
+plotDispEsts(dds)
+```
+```{r}
+raw_counts <- counts(dds, normalized = FALSE)
+normalized_counts <- counts(dds, normalized = TRUE)
+
+df <- data.frame(
+  Sample = rep(colnames(dds), 2),
+  Counts = c(colSums(raw_counts), colSums(normalized_counts)),
+  Type = rep(c("Raw", "Normalized"), each = ncol(dds))
+)
+
+plt <- ggplot(df, aes(x = Sample, y = Counts, fill = Type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(title = "Counts before and after normalization", x = "Sample", y = "Total Counts") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+plt
+ggsave("./pictures_tRNA_transpl/transpl_tRNA_Counts before and after normalization.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+rlog трансформация
+```{r}
+rlt <- rlog(dds)  #rlog Transformation
+meanSdPlot(assay(rlt)) 
+
+```
+```{r}
+vsd <- varianceStabilizingTransformation(dds, blind=FALSE) 
+meanSdPlot(assay(vsd)) #показывает, как изменяется стандартное отклонение в зависимости от среднего значения экспрессии
+```
+
+** PCA plot **
+```{r}
+pcaData <- plotPCA(rlt, intgroup=c("condition"), returnData = TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+
+pcaData$sample <- gsub("_.*", "", coldata$sample)
+
+
+plt <- ggplot(pcaData, aes(PC1, PC2, color = condition)) +
+  geom_text(aes(label=sample), size=3, vjust=1.5) +
+  geom_point(size = 3) +
+  xlab(paste0("PC1: ", percentVar[1], "%")) +
+  ylab(paste0("PC2: ", percentVar[2], "%")) + 
+  coord_fixed() +
+  theme_bw() +
+  scale_color_brewer(palette = "Set2")
+plt
+ggsave("./pictures_transpl/transpl_PCA plot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+
+**Plot a heatmap of 50 most expressed genes**
+Этот heatmap отражает уровни экспрессии генов, а не разницу между группами.
+Цвета не означают up- или down-регуляцию в сравнении с контрольной группой, потому что heatmap показывает абсолютные значения экспрессии, а не fold change!
+```{r}
+select <- order(rowMeans(counts(dds,normalized=TRUE)),
+                decreasing=TRUE)[1:50]
+df <- as.data.frame(colData(dds)$condition)
+colnames(df) <- "condition"
+rownames(df) <- colnames(counts(dds))
+plt <- pheatmap(assay(rlt)[select,], 
+         cluster_rows = TRUE, 
+         show_rownames = TRUE, 
+         cluster_cols = TRUE, 
+         annotation_col = df,
+         fontsize_row = 6) 
+
+plt
+ggsave("./pictures_transpl/transpl_Plot a heatmap of 50 most expressed genes.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**Plot of the distance between samples heatmap**
+Расчет расстояний между образцами
+	•	Обычно используется евклидово расстояние (по умолчанию в DESeq2).
+	•	Оно вычисляется по нормализованным данным экспрессии (rlog() или vst()).
+	•	Чем меньше расстояние — тем более похожи образцы.
+```{r}
+sampleDists <- dist(t(assay(rlt)))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- paste(rlt$condition)
+colnames(sampleDistMatrix) <- paste(rlt$condition)
+colors <- colorRampPalette(rev(brewer.pal(9, "Blues")) )(255)
+
+plt <- pheatmap(sampleDistMatrix,
+         clustering_distance_rows = "euclidean",
+         clustering_distance_cols = "euclidean",
+         color = colors)
+
+plt
+ggsave("./pictures_transpl/transpl_Plot of the distance between samples heatmap.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+```{r}
+res_humoral <- results(dds, contrast=c("condition", "humoral", "no_complications"))
+res_humoral
+```
+**MA plot**
+Фильтрация точек с низким средним экспрессированием (по baseMean).
+	•	Обычно отсекаются baseMean < 1.
+	2.	Определение значимых генов (синие точки):
+	•	Используется критерий padj < 0.1 по умолчанию, а не < 0.05! 
+```{r}
+tiff("./pictures_transpl/transpl_PlotMA_standart_padj_0.05_humoral.tiff", 
+     width = 8, height = 6, units = "in", res = 300, bg = "white")
+plotMA(res_humoral, alpha = 0.05, ylim = c(-8, 8)) 
+dev.off()
+plotMA(res_humoral, alpha = 0.05, ylim = c(-8, 8)) 
+```
+**Кастомный MA plot**
+```{r}
+res_df <- res_humoral %>%
+  as.data.frame() %>%
+  mutate(color = case_when( 
+    padj < 0.05  ~ "padj < 0.05",   
+    pvalue < 0.05  ~ "pvalue < 0.05", 
+    TRUE ~ "All"
+  ))
+
+plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
+  geom_point(alpha = 0.7, size = 1) +
+  geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +
+  scale_color_manual(values = c("All" = "gray70", 
+                                "pvalue < 0.05" = "blue", 
+                                "padj < 0.05" = "red")) +
+  scale_x_log10(labels = scales::scientific) + 
+  theme_minimal() +
+  labs(x = "mean of normalized counts", 
+       y = "log fold change", 
+       color = NULL)
+
+plt
+ggsave("./pictures_transpl/transpl_Сustom MAplot_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+
+**Значимые результаты**
+
+
+
+Visualisation for the first gene
+```{r}
+#plotCounts(dds, gene=which.max(res_humoral$log2FoldChange), intgroup="condition")
+plotCounts(dds, gene=which.min(res_humoral$padj), intgroup="condition")
+#plotCounts(dds, gene=rownames(res)[which.min(res$padj[which.max(res$log2FoldChange)])], intgroup="condition")
+```
+*Визуализация в виде боксплотов *
+hsa-miR-193b-5p
+hsa-miR-1468-5p
+hsa-miR-5588-5p
+hsa-miR-100-5p
+hsa-miR-193b-3p
+hsa-miR-483-5p
+hsa-miR-197-5p
+hsa-miR-125b-5p
+hsa-miR-146a-5p
+```{r}
+gene_idx <- which.min(res_humoral$padj)
+gene_name <- rownames(res_humoral)[gene_idx]  
+  
+count_data <- plotCounts(dds, gene=gene_idx, intgroup="condition", returnData=TRUE)
+count_data$sample <- gsub("_.*", "", rownames(count_data))  
+
+plt <- ggplot(count_data, aes(x=condition, y=count, fill=condition)) +
+  geom_boxplot(alpha=0.5) +
+  geom_text(aes(label=sample), size=3, vjust=-1) + 
+  geom_jitter(width=0.2, size=2, alpha=0.7) +
+  scale_y_log10() +
+  ggtitle(paste("Expression of", gene_name)) +
+  theme_minimal()
+
+plt
+ggsave("./pictures_transpl/transpl_boxplots_humoral_hsa-miR-193b-5p.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+**Volcano plot**
+```{r}
+plt <- EnhancedVolcano(res_humoral,
+                lab = rownames(res_humoral),
+                x = "log2FoldChange",
+                y = "pvalue",
+                pCutoff = 0.05,
+                FCcutoff = 1,
+                labSize = 3.0,
+                boxedLabels = FALSE,
+                col = c('black', '#CBD5E8', '#B3E2CD', '#FDCDAC'),
+                colAlpha = 1,
+                title = NULL,        
+                subtitle = NULL) 
+
+plt
+ggsave("./pictures_transpl/transpl_VolcanoPlot_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+```{r}
+coldata_filtered <- coldata[coldata$condition %in% c("humoral", "no_complications"), ]
+coldata_filtered
+```
+
+**Plot a heatmap of diff expressed genes**
+```{r}
+res_sign_humoral <- subset(res_humoral, pvalue < 0.05 & !is.na(padj) & abs(log2FoldChange) > 1.0)
+res_sign_humoral <- res_sign_humoral[order(res_sign_humoral$log2FoldChange, decreasing = TRUE), ]
+
+sig_genes <- rownames(res_sign_humoral)  
+
+de_mat <- assay(rlt)[sig_genes, ] 
+
+de_mat_filtered <- de_mat[, coldata_filtered$sample]
+#datamatrix <- t(scale(t(de_mat_filtered)))
+datamatrix <- de_mat_filtered
+
+annotation_col <- data.frame(condition = coldata_filtered$condition)
+rownames(annotation_col) <- colnames(datamatrix)
+
+annotation_colors <- list(
+  condition = c("no_complications" = "#FFCC00", "humoral" = "#3399FF"))
+
+plt <- pheatmap(datamatrix,
+         cluster_rows = TRUE, 
+         show_rownames = TRUE, 
+         cluster_cols = TRUE, 
+         annotation_col = annotation_col,
+         annotation_colors = annotation_colors,
+         display_numbers = FALSE,
+         legend = TRUE,
+         fontsize = 15)  
+
+ggsave("./pictures_transpl/transpl_Heatmap of diff expressed genes_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+##Клеточное отторжение
+```{r}
+res_cellular <- results(dds, contrast=c("condition", "cellular", "no_complications"))
+res_cellular
+```
+**MA plot**
+
+```{r}
+tiff("./pictures_transpl/transpl_PlotMA_standart_padj_0.05_cellular.tiff", 
+     width = 8, height = 6, units = "in", res = 300, bg = "white")
+plotMA(res_cellular, alpha = 0.05, ylim = c(-8, 8)) 
+dev.off()
+plotMA(res_cellular, alpha = 0.05, ylim = c(-8, 8)) 
+```
+**Кастомный MA plot**
+```{r}
+res_df <- res_cellular %>%
+  as.data.frame() %>%
+  mutate(color = case_when( 
+    padj < 0.05  ~ "padj < 0.05",   
+    pvalue < 0.05  ~ "pvalue < 0.05", 
+    TRUE ~ "All"
+  ))
+
+plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
+  geom_point(alpha = 0.7, size = 1) +
+  geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +
+  scale_color_manual(values = c("All" = "gray70", 
+                                "pvalue < 0.05" = "blue", 
+                                "padj < 0.05" = "red")) +
+  scale_x_log10(labels = scales::scientific) + 
+  theme_minimal() +
+  labs(x = "mean of normalized counts", 
+       y = "log fold change", 
+       color = NULL)
+
+plt
+ggsave("./pictures_transpl/transpl_Сustom MAplot_cellular.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**БКAПC**
+```{r}
+res_TCAD <- results(dds, contrast=c("condition", "TCAD", "no_complications"))
+res_TCAD
+```
+
+**MA plot**
+```{r}
+tiff("./pictures_transpl/transpl_PlotMA_standart_padj_0.05_TCAD.tiff", 
+     width = 8, height = 6, units = "in", res = 300, bg = "white")
+plotMA(res_TCAD, alpha = 0.05, ylim = c(-8, 8)) 
+dev.off()
+plotMA(res_TCAD, alpha = 0.05, ylim = c(-8, 8)) 
+```
+## Кастомный MA plot
+```{r}
+res_df <- res_TCAD %>%
+  as.data.frame() %>%
+  mutate(color = case_when( 
+    padj < 0.05  ~ "padj < 0.05",   
+    pvalue < 0.05  ~ "pvalue < 0.05", 
+    TRUE ~ "All"
+  ))
+
+plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
+  geom_point(alpha = 0.7, size = 1) +
+  geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +
+  scale_color_manual(values = c("All" = "gray70", 
+                                "pvalue < 0.05" = "blue", 
+                                "padj < 0.05" = "red")) +
+  scale_x_log10(labels = scales::scientific) + 
+  theme_minimal() +
+  labs(x = "mean of normalized counts", 
+       y = "log fold change", 
+       color = NULL)
+
+plt
+ggsave("./pictures_transpl/transpl_Сustom_MAplot_TCAD.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**Значимые результаты**
+```{r}
+signres_TCAD <- results(dds, contrast=c("condition", "TCAD", "no_complications"), alpha=0.05) 
+summary(signres_TCAD)
+```
+**Volcano plot**
+```{r}
+plt <- EnhancedVolcano(res_TCAD,
+                lab = rownames(res_TCAD),
+                x = "log2FoldChange",
+                y = "padj",
+                pCutoff = 0.05,
+                FCcutoff = 1,
+                labSize = 3.0,
+                boxedLabels = FALSE,
+                col = c('black', '#CBD5E8', '#B3E2CD', '#FDCDAC'),
+                colAlpha = 1,
+                title = NULL,        
+                subtitle = NULL) 
+
+plt
+ggsave("./pictures_transpl/transpl_VolcanoPlot_TCAD.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+```{r}
+gene_idx <- which.min(res_TCAD$padj)
+gene_name <- rownames(res_TCAD)[gene_idx]  
+
+# selected_miRNA <- "hsa-miR-193b-5p"
+# 
+# gene_idx <- which(rownames(res_humoral) == selected_miRNA)
+# gene_name <- rownames(res_humoral)[gene_idx] 
+  
+count_data <- plotCounts(dds, gene=gene_idx, intgroup="condition", returnData=TRUE)
+count_data$sample <- gsub("_.*", "", rownames(count_data))  
+
+plt <- ggplot(count_data, aes(x=condition, y=count, fill=condition)) +
+  geom_boxplot(alpha=0.5) +
+  geom_text(aes(label=sample), size=3, vjust=-1) + 
+  geom_jitter(width=0.2, size=2, alpha=0.7) +
+  scale_y_log10() +
+  ggtitle(paste("Expression of", gene_name)) +
+  theme_minimal()
+
+plt
+ggsave("./pictures_transpl/transpl_boxplots_TCAD_hsa-miR-582-3p.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+**Анализ обогащения TCAD**
+```{r}
+res_sign_TCAD <- subset(res_TCAD, padj < 0.05 & !is.na(padj) & abs(log2FoldChange) > 1.0)
+
+up_TCAD <- res_sign_TCAD %>% 
+  as.data.frame() %>% 
+  filter(log2FoldChange > 0)
+down_TCAD <- res_sign_TCAD %>% 
+  as.data.frame() %>% 
+  filter(log2FoldChange < 0)
+rownames(up_TCAD)
+rownames(down_TCAD)
+```
+Если Gln_Comb_12 снижена, это может отражать:
+Снижение синтеза белков с глутамином → стресс клеток
+Изменение метаболизма глутамина → влияние на рост и воспаление
+Гены с частыми CAA/CAG (глутамин) кодонами могут быть даунрегулированы из-за нехватки тРНК.
+
+

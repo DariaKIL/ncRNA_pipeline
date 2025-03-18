@@ -273,7 +273,7 @@ dds_150 <- DESeq(dds_150, fitType = "parametric")
 plotDispEsts(dds_150)
 ```
 ```{r}
-res_150 <- results(dds_150, contrast=c("condition", "before", "after"))
+res_150 <- results(dds_150, contrast=c("condition", "after", "before"))
 res_150
 ```
 **MA plot**
@@ -316,7 +316,7 @@ ggsave("./pictures/Сustom MAplot_type150.tiff", plot = plt, width = 8, height =
 ```
 **Значимые результаты**
 ```{r}
-signres_150 <- results(dds_150, contrast=c("condition", "before", "after"), alpha=0.05) 
+signres_150 <- results(dds_150, contrast=c("condition", "after", "before"), alpha=0.05) 
 summary(signres_150)
 ```
 Let's arranged it by log2FoldChange:
@@ -326,10 +326,34 @@ res_150[order_indices, ]
 ```
 Visualisation for the first gene
 ```{r}
-#plotCounts(dds_150, gene=which.max(res_150$log2FoldChange), intgroup="condition")
 plotCounts(dds_150, gene=which.min(res_150$padj), intgroup="condition")
-#plotCounts(dds, gene=rownames(res)[which.min(res$padj[which.max(res$log2FoldChange)])], intgroup="condition")
+
 ```
+```{r}
+gene_idx <- which.min(res_150$padj)
+gene_name <- rownames(res_150)[gene_idx]  
+
+# selected_miRNA <- "hsa-miR-193b-5p"
+# 
+# gene_idx <- which(rownames(res_humoral) == selected_miRNA)
+# gene_name <- rownames(res_humoral)[gene_idx] 
+  
+count_data <- plotCounts(dds_150, gene=gene_idx, intgroup="condition", returnData=TRUE)
+count_data$sample <- gsub("_.*", "", rownames(count_data))  
+
+plt <- ggplot(count_data, aes(x=condition, y=count, fill=condition)) +
+  geom_boxplot(alpha=0.5) +
+  geom_text(aes(label=sample), size=3, vjust=-1) + 
+  geom_jitter(width=0.2, size=2, alpha=0.7) +
+  scale_y_log10() +
+  ggtitle(paste("Expression of", gene_name)) +
+  theme_minimal()
+
+plt
+ggsave("./pictures/boxplots_humoral_hsa-miR-208b-3p.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+
+
 **Volcano plot**
 ```{r}
 plt <- EnhancedVolcano(res_150,
@@ -457,8 +481,8 @@ rownames(down_150)
 ```
 почти все риды (кроме двух) относились к hsa-miR-133a-3p 
 ```{r}
-mirna_names_up <- c("hsa-miR-328-3p")
-mirna_names_down <- c("hsa-miR-133a-3p", "hsa-miR-208b-3p", "hsa-miR-499a-5p")
+mirna_names_up<- c("hsa-miR-133a-3p", "hsa-miR-208b-3p", "hsa-miR-499a-5p")
+mirna_names_down <- c("hsa-miR-328-3p")
 ```
 
 **Конвертация в MIMATID**
@@ -529,9 +553,6 @@ combined_plot <- p1 + p2
 
 ggsave("./pictures/GO_enrichment_dotplot_BP_type150.tiff", plot = combined_plot, width = 16, height = 10, dpi = 300)
 ```
-После АКШ организм пациента переходит в фазу адаптации и восстановления, что отражается в регуляции биологических процессов:
-	•	Активируется транспорт белков, аутофагия, регенерация тканей и пластичность нервной системы, что помогает клеткам выжить и восстановиться.
-	•	Снижается активность клеточного деления, экспрессии генов и иммунного ответа, что может предотвращать воспалительное повреждение и поддерживать гомеостаз.
 ```{r}
 GO_enrich_UP150_BP <- enrichplot::pairwise_termsim(GO_enrich_up150_bp, method = "JC")
 
@@ -548,7 +569,29 @@ plt
 
 ggsave("./pictures/GO_enrichment_emapplot_BP_up_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
+```{r}
+GO_enrich_up150_bp@result$Description[1:20]
+```
+**“RNA splicing”, “mRNA splicing, via spliceosome”, “alternative mRNA splicing, via spliceosome”, “RNA splicing, via transesterification reactions”**
+	•	Операция вызывает стрессовую реакцию в клетках миокарда и сосудов, приводя к изменениям в экспрессии генов.
+	•	Сплайсинг мРНК активно перестраивается в условиях гипоксии, реперфузии и воспаления, изменяя профили изоформ белков, связанных с адаптацией к повреждению.
+	•	Возможна роль специфических малых РНК, включая tRFs, в модуляции сплайсинга.
 
+**“cytoplasmic translation”, “protein-RNA complex assembly”, “ribonucleoprotein complex biogenesis”**
+	•	Острая ишемия и последующая реперфузия требуют быстрого восстановления белкового синтеза, что может активировать механизмы трансляции.
+	•	Рибонуклеопротеиновые комплексы участвуют в регуляции повреждённого эндотелия и активации воспалительных каскадов.
+
+**“positive regulation of DNA metabolic process”, “positive regulation of DNA repair”**
+	•	Операция и реперфузия могут вызывать оксидативный стресс, повреждения ДНК и активацию механизмов репарации.
+	•	ДНК-ремонтные пути помогают предотвратить апоптоз клеток сердечной ткани.
+
+**“chromosome segregation”, “sister chromatid segregation”, “nuclear chromosome segregation”, “spindle organization”**
+	•	Возможно, связано с повышенной пролиферацией эндотелиальных клеток или иммунных клеток в ответ на воспаление после операции.
+	•	Активация клеточного цикла может происходить в регенерирующих тканях.
+
+**“mononuclear cell differentiation”, “cellular response to external stimulus”**
+	•	Операция вызывает активацию иммунных клеток (моноциты, макрофаги), которые участвуют в заживлении.
+	•	Стресс-индуцированные каскады влияют на экспрессию иммунных генов и дифференцировку клеток.
 ```{r}
 GO_enrich_DOWN150_BP <- enrichplot::pairwise_termsim(GO_enrich_down150_bp, method = "JC")
 
@@ -565,6 +608,36 @@ plt
 
 ggsave("./pictures/GO_enrichment_emapplot_BP_down_type150.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
+```{r}
+GO_enrich_down150_bp@result$Description[1:20]
+```
+Даунрегуляция этих путей после аортокоронарного шунтирования (АКШ) может быть связана с общим стресс-ответом, метаболической адаптацией и подавлением нейронально-связанной активности в условиях воспаления и реперфузии.
+
+**“synapse organization”, “axonogenesis”, “regulation of neuron projection development”, “positive regulation of nervous system development”, “neuron projection extension”, “positive regulation of neurogenesis”**
+	•	Операция и гипоксия вызывают системный стресс, что может привести к снижению активности нейротрофических факторов (например, BDNF, NGF), регулирующих рост и развитие нейронов.
+	•	Возможна дисфункция периферической нервной системы, связанная с воспалением и повреждением сосудов.
+	•	АКШ может вызывать когнитивные изменения из-за микроинсультов, воспаления или влияния анестезии на нейрональные пути.
+	
+**“small GTPase-mediated signal transduction”, “regulation of small GTPase mediated signal transduction”** 
+	•	Малые GTPases (Rho, Rac, Rab) участвуют в регуляции клеточной морфологии, транспорта и миграции.
+	•	Их подавление может быть связано с нарушением внутриклеточного трафика и транспорта белков из-за стресса и воспаления.
+	•	Снижение активности этих путей может указывать на дисфункцию цитоскелета и клеточного транспорта.
+
+**“vesicle-mediated transport in synapse”, “synaptic vesicle cycle”, “vesicle organization”**
+	•	Связано с подавлением синаптической передачи → снижение активности нервной системы.
+	•	Может отражать сниженную потребность в нейрональной активности, поскольку организм приоритетно направляет ресурсы на восстановление сердечно-сосудистой системы.
+
+**“protein localization to nucleus”, “positive regulation of protein localization”, “establishment of protein localization to organelle”**
+	•	Подавление этих путей может указывать на сниженную ядерную активность в некоторых клетках (например, в нейронах или эндотелиальных клетках).
+	•	Вероятно, связано с глобальным снижением скорости клеточного метаболизма в условиях стресса.
+
+**“cell growth”, “developmental cell growth”, “developmental growth involved in morphogenesis”, “regulation of cell morphogenesis”**
+	•	Организм приоритетно тратит энергию на восстановление сердечно-сосудистой системы, а не на активный клеточный рост.
+	•	Может быть связано с подавлением ангиогенеза или пролиферации клеток в нецелевых тканях.
+
+**“macroautophagy”**
+	•	Аутофагия регулирует очистку клеток от повреждённых белков и органелл, но после операции её снижение может отражать изменение метаболических приоритетов.
+	•	Возможна роль воспалительных сигналов, подавляющих аутофагию в некоторых клетках.
 
 **GO Enrichment of Molecular Function**
 ```{r}
@@ -678,7 +751,7 @@ dds_16 <- DESeq(dds_16, fitType = "parametric")
 plotDispEsts(dds_16)
 ```
 ```{r}
-res_16 <- results(dds_16, contrast=c("condition", "before", "after"))
+res_16 <- results(dds_16, contrast=c("condition", "after", "before"))
 res_16
 ```
 **MA plot**
@@ -722,24 +795,30 @@ ggsave("./pictures/PlotMA_castom_pvalue0.05_type16.tiff", plot = plt, width = 8,
 ```
 **Значимые результаты**
 ```{r}
-summary(results(dds_16, contrast=c("condition", "before", "after"), alpha=0.05))
+summary(results(dds_16, contrast=c("condition", "after", "before"), alpha=0.05))
 ```
 ```{r}
 gene_idx <- which.min(res_16$padj)
-gene_name <- rownames(res_16)[gene_idx]  # Имя гена
+gene_name <- rownames(res_16)[gene_idx]  
 
-count_data <- plotCounts(dds, gene=gene_idx, intgroup="condition", returnData=TRUE)
-
-
+# selected_miRNA <- "hsa-miR-193b-5p"
+# 
+# gene_idx <- which(rownames(res_humoral) == selected_miRNA)
+# gene_name <- rownames(res_humoral)[gene_idx] 
+  
+count_data <- plotCounts(dds_16, gene=gene_idx, intgroup="condition", returnData=TRUE)
 count_data$sample <- gsub("_.*", "", rownames(count_data))  
 
-ggplot(count_data, aes(x=condition, y=count, color=condition)) +
-  geom_jitter(width=0.2, size=2) + 
+plt <- ggplot(count_data, aes(x=condition, y=count, fill=condition)) +
+  geom_boxplot(alpha=0.5) +
   geom_text(aes(label=sample), size=3, vjust=-1) + 
-  scale_y_log10() +  #это можно убрать и будет нормальная шкала
-  ggtitle(paste(gene_name)) + 
-  theme_minimal() +
-  theme(plot.title = element_text(size=14))
+  geom_jitter(width=0.2, size=2, alpha=0.7) +
+  scale_y_log10() +
+  ggtitle(paste("Expression of", gene_name)) +
+  theme_minimal()
+
+plt
+ggsave("./pictures/boxplots_humoral_hsa-miR-126-3p.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
 
 Let's arranged it by log2FoldChange:
@@ -766,9 +845,6 @@ plt <- EnhancedVolcano(res_16,
                 colAlpha = 1,
                 title = NULL,        
                 subtitle = NULL) 
-```{r}
-
-```
 
 plt
 ggsave("./pictures/Volcano plot_based_on_Pvalue_16type.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
@@ -782,6 +858,7 @@ ggsave("./pictures/Volcano plot_based_on_Pvalue_16type.tiff", plot = plt, width 
 rlt_16 <- rlog(dds_16) 
 meanSdPlot(assay(rlt_16))  #показывает, как изменяется стандартное отклонение в зависимости от среднего значения экспрессии.
 ```
+
 ```{r}
 pcaData <- plotPCA(rlt_16, intgroup=c("condition", "patient"), returnData = TRUE)
 percentVar <- round(100 * attr(pcaData, "percentVar"))
@@ -794,6 +871,8 @@ ggplot(pcaData, aes(PC1, PC2, shape = patient, color = condition)) +
   theme_bw() +
   scale_color_brewer(palette = "Set2")
 ```
+
+
 ```{r}
 assay(rlt_16) <- limma::removeBatchEffect(assay(rlt_16),
                                        batch = colData(dds_16)[,'patient'])
@@ -812,6 +891,7 @@ plt <- ggplot(pcaData, aes(PC1, PC2, shape = patient, color = condition)) +
 plt
 ggsave("./pictures/PCA plot for type 16 after removing donor effect.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
+
 **Plot a heatmap of the most expressed genes**
 
 ```{r}
@@ -844,6 +924,7 @@ plt <- pheatmap(datamatrix,
 plt
 ggsave("./pictures/Heatmap of diff expressed genes_type16.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
+
 **Plot of the distance between samples heatmap**
 Расчет расстояний между образцами
 	•	Обычно используется евклидово расстояние (по умолчанию в DESeq2).
@@ -867,6 +948,7 @@ plt <- pheatmap(sampleDistMatrix_16,
 plt
 ggsave("./pictures/Plot of the distance between samples_type16.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
+
 ### Анализ обогащения для везикул типа 16 ###
 ```{r}
 # up_16 <- res_sign_16 %>% 
@@ -878,7 +960,7 @@ ggsave("./pictures/Plot of the distance between samples_type16.tiff", plot = plt
 # rownames(up_16)
 # rownames(down_16)
 
-up_16 <- "hsa-miR-126-3p" 
+down_16 <- "hsa-miR-126-3p" 
 
 ```
 
@@ -910,18 +992,18 @@ up_16 <- "hsa-miR-126-3p"
 **Конвертация в MIMATID** 
 
 ```{r}
-converted_mirna_up16 <- miRNAVersionConvert(up_16)
-converted_mirna_up16
+converted_mirna_down16 <- miRNAVersionConvert(down_16)
+converted_mirna_down16
 ```
 **Запрос таргетов из базы multiMiR**
 ```{r}
-targets16_down <- unique(get_multimir(org = "hsa", mirna = converted_mirna_up16$Accession, table = "validated")@data$target_symbol)
+targets16_up <- unique(get_multimir(org = "hsa", mirna = converted_mirna_down16$Accession, table = "validated")@data$target_symbol)
 ```
 
 **Анализ обогащения, связанный со Biological Process**
 ```{r}
-GO_enrich_down16_bp <- enrichGO(
-  gene          = targets16_down,  
+GO_enrich_up16_bp <- enrichGO(
+  gene          = targets16_up,  
   OrgDb         = org.Hs.eg.db,
   keyType       = "SYMBOL",
   ont           = "BP", 
@@ -931,7 +1013,7 @@ GO_enrich_down16_bp <- enrichGO(
 ```
 
 ```{r}
-plt <- dotplot(GO_enrich_down16_bp, showCategory = 20) + 
+plt <- dotplot(GO_enrich_up16_bp, showCategory = 20) + 
   ggtitle("BP for DOWNregulated Targets in Vesicles 16") + 
   theme(
     plot.title = element_text(size = 12, face = "bold"),
@@ -941,10 +1023,11 @@ plt
 ggsave("./pictures/GO_enrichment_dotplot_BP_type16.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
 
-```{r}
-GO_enrich_DOWN16_BP <- enrichplot::pairwise_termsim(GO_enrich_down16_bp, method = "JC")
 
-plt <- emapplot(GO_enrich_DOWN16_BP, 
+```{r}
+GO_enrich_UP16_BP <- enrichplot::pairwise_termsim(GO_enrich_up16_bp, method = "JC")
+
+plt <- emapplot(GO_enrich_UP16_BP, 
          repel = TRUE,
          showCategory = 20) +
   ggtitle("BP for DOWNregulated targets for vesicles 16") +
@@ -955,13 +1038,24 @@ plt <- emapplot(GO_enrich_DOWN16_BP,
 
 plt
 
-ggsave("./pictures/GO_enrichment_emapplot_BP_DOWN_type16.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+ggsave("./pictures/GO_enrichment_emapplot_BP_UP_type16.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
+```{r}
+GO_enrich_up16_bp@result$Description[1:20]
+```
+**miR-126-3p в этих везикулах может быть маркёром усиленной эндотелиальной регенерации после АКШ**
+	•	Регулирует ангиогенез и репарацию сосудов
+	•	Влияет на пролиферацию эндотелиальных клеток
+	•	Участвует в сигнальных каскадах роста и деления клеток
+Все пути связаны с клеточным циклом, митозом и регенерацией, что важно после АКШ.
+ miR-126-3p регулирует митоз и ангиогенез, подавляя ингибиторы роста (например, FOXO3, PIK3R2).
+Везикулы, открученные при 16 000 об/мин, могут быть более богаты на пролиферативные сигналы 
 
+	
 **GO Enrichment of Molecular Function**
 ```{r}
-GO_enrich_down16_MF <- enrichGO(
-  gene          = targets16_down,  
+GO_enrich_up16_MF <- enrichGO(
+  gene          = targets16_up,  
   OrgDb         = org.Hs.eg.db,
   keyType       = "SYMBOL",
   ont           = "MF", 
@@ -969,7 +1063,7 @@ GO_enrich_down16_MF <- enrichGO(
   qvalueCutoff  = 0.05
 )
 
-plt <- dotplot(GO_enrich_down16_MF, showCategory = 20) + 
+plt <- dotplot(GO_enrich_up16_MF, showCategory = 20) + 
   ggtitle("Molecular Functiont for Downregulated Targets in Vesicles 16") + 
   theme(
     plot.title = element_text(size = 12, face = "bold"),
@@ -980,12 +1074,12 @@ ggsave("./pictures/GO_enrichment_dotplot_MF_type16.tiff", plot = plt, width = 16
 ```
 
 ```{r}
-GO_enrich_DOWN16_MF <- enrichplot::pairwise_termsim(GO_enrich_down16_MF, method = "JC")
+GO_enrich_UP16_MF <- enrichplot::pairwise_termsim(GO_enrich_up16_MF, method = "JC")
 
-plt <- emapplot(GO_enrich_DOWN16_MF, 
+plt <- emapplot(GO_enrich_UP16_MF, 
          repel = TRUE,
          showCategory = 25) +
-  ggtitle("Molecular Function processes for DOWNregulated targets for vesicles 16") +
+  ggtitle("Molecular Function processes for UPregulated targets for vesicles 16") +
   theme(
     plot.title = element_text(size = 12, face = "bold"),
     axis.text = element_text(size = 3)
@@ -993,7 +1087,7 @@ plt <- emapplot(GO_enrich_DOWN16_MF,
 
 plt
 
-ggsave("./pictures/GO_enrichment_emapplot_MF_down_type16.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+ggsave("./pictures/GO_enrichment_emapplot_MF_up_type16.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
 
 
