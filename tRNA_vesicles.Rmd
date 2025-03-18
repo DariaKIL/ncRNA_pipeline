@@ -3,6 +3,10 @@ title: "tRNA Vesicles"
 output:
   html_notebook: default
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE) 
+```
 **Устанавливаем необходимые библиотки**
 ```{r}
 library(tidyverse)
@@ -145,6 +149,29 @@ plt <- ggplot(pcaData, aes(PC1, PC2, shape = patient, color = condition_type)) +
 plt
 ggsave("./pictures_tRNA_vesicles/PCA plot for all dataset after removing donor effect.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
+```{r}
+# pcs_count <- 4  # Количество главных компонент
+# pca_result <- prcomp(t(assay(rlt)), center = TRUE, scale. = TRUE) 
+# 
+# # Достаем объяснённую дисперсию
+# explained_variance_ratio <- pca_result$sdev^2 / sum(pca_result$sdev^2)
+# 
+# # Преобразуем в датафрейм
+# miRNA_pca_df <- as.data.frame(pca_result$x[, 1:pcs_count])  
+# colnames(miRNA_pca_df) <- paste0("PC", 1:pcs_count, " (", round(explained_variance_ratio[1:pcs_count] * 100, 2), "%)")
+# 
+# # Добавляем группы
+# miRNA_pca_df$Group <- paste(coldata$condition, coldata$type, sep = "_")
+# 
+# # Аналог sns.pairplot - ggpairs()
+# ggpairs(
+#   miRNA_pca_df, aes(color = Group, alpha = 0.7)
+# ) +
+#   ggtitle("PCA Plot of miRNAs dataset, colored by group")
+```
+
+
+
 **Plot a heatmap of 50 most expressed genes**
 Этот heatmap отражает уровни экспрессии генов, а не разницу между группами.
 Цвета не означают up- или down-регуляцию в сравнении с контрольной группой, потому что heatmap показывает абсолютные значения экспрессии, а не fold change!

@@ -3,6 +3,10 @@ title: "micro-RNA Vesicles"
 output:
   html_notebook: default
 ---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE) 
+```
+
 **Устанавливаем необходимые библиотки**
 ```{r}
 library(tidyverse)
