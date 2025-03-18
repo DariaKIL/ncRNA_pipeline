@@ -211,7 +211,7 @@ plt
 ggsave("./pictures_transpl/transpl_Plot of the distance between samples heatmap.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 ```{r}
-res_humoral <- results(dds, contrast=c("condition", "no_complications", "humoral"))
+res_humoral <- results(dds, contrast=c("condition", "humoral", "no_complications"))
 res_humoral
 ```
 **MA plot**
@@ -254,10 +254,8 @@ ggsave("./pictures_transpl/transpl_Сustom MAplot_humoral.tiff", plot = plt, wid
 
 **Значимые результаты**
 
-58 генов (20%) имеют низкие уровни экспрессии и фильтруются из анализа.
-independent filtering — процедура, которая исключает гены с низкими значениями для увеличения статистической мощности.
 ```{r}
-signres_humoral <- results(dds, contrast=c("condition", "no_complications", "humoral"), alpha=0.05) 
+signres_humoral <- results(dds, contrast=c("condition", "humoral", "no_complications"), alpha=0.05) 
 summary(signres_humoral)
 ```
 Let's arranged it by log2FoldChange:
@@ -270,6 +268,39 @@ Visualisation for the first gene
 #plotCounts(dds, gene=which.max(res_humoral$log2FoldChange), intgroup="condition")
 plotCounts(dds, gene=which.min(res_humoral$padj), intgroup="condition")
 #plotCounts(dds, gene=rownames(res)[which.min(res$padj[which.max(res$log2FoldChange)])], intgroup="condition")
+```
+*Визуализация в виде боксплотов *
+hsa-miR-193b-5p
+hsa-miR-1468-5p
+hsa-miR-5588-5p
+hsa-miR-100-5p
+hsa-miR-193b-3p
+hsa-miR-483-5p
+hsa-miR-197-5p
+hsa-miR-125b-5p
+hsa-miR-146a-5p
+```{r}
+# gene_idx <- which.min(res_humoral$padj)
+# gene_name <- rownames(res_humoral)[gene_idx]  
+
+selected_miRNA <- "hsa-miR-193b-5p"
+
+gene_idx <- which(rownames(res_humoral) == selected_miRNA)
+gene_name <- rownames(res_humoral)[gene_idx] 
+  
+count_data <- plotCounts(dds, gene=gene_idx, intgroup="condition", returnData=TRUE)
+count_data$sample <- gsub("_.*", "", rownames(count_data))  
+
+plt <- ggplot(count_data, aes(x=condition, y=count, fill=condition)) +
+  geom_boxplot(alpha=0.5) +
+  geom_text(aes(label=sample), size=3, vjust=-1) + 
+  geom_jitter(width=0.2, size=2, alpha=0.7) +
+  scale_y_log10() +
+  ggtitle(paste("Expression of", gene_name)) +
+  theme_minimal()
+
+plt
+ggsave("./pictures_transpl/transpl_boxplots_humoral_hsa-miR-193b-5p.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
 **Volcano plot**
 ```{r}
@@ -338,56 +369,18 @@ down_humoral <- res_sign_humoral %>%
 rownames(up_humoral)
 rownames(down_humoral)
 ```
-Переводим в miRBase
-	•	miRBase: https://www.mirbase.org/
-	•	MirGeneDB: https://mirgenedb.org/
-```{r}
-url <- "https://mirgenedb.org/browse/hsa"
-page <- read_html(url)
-```
 
-Парсим таблицу
-```{r}
-mir_table <- page %>%
-  html_element("table") %>%
-  html_table(fill = TRUE) 
-
-mir_table <- mir_table[-c(1:3), c(1,2) ] 
-colnames(mir_table) <- c("MirGeneDB_ID", "MiRBase_ID")
-mir_table$MirGeneDB_ID <- sub(" V", "", mir_table$MirGeneDB_ID)
-
-head(mir_table)
-```
-```{r}
-down_humoral_clean <- sub("_.*", "", row.names(down_humoral))
-down_humoral_converted <- mir_table$MiRBase_ID[match(down_humoral_clean, mir_table$MirGeneDB_ID)]
-down_humoral_converted
-```
 
 **Конвертация в MIMATID** 
-NA без соответствия удалила из анализа
 
-NA Hsa-Mir-148-P2_3p  есть три похожих соответствия:
-Hsa-Mir-148-P1	hsa-mir-148a																			
-Hsa-Mir-148-P3	hsa-mir-152																				
-Hsa-Mir-148-P4	hsa-mir-148b
-
-NA Hsa-Mir-10-P2a_5p есть три похожих соответствие: 
-Hsa-Mir-10-P2b	hsa-mir-99b															
-Hsa-Mir-10-P2c	hsa-mir-99a																		
-Hsa-Mir-10-P2d	hsa-mir-100
-
-[1] "Hsa-Mir-146-P1_5p"   "Hsa-Mir-425_3p*"     "Hsa-Mir-148-P2_3p"   "Hsa-Mir-10-P3c_5p"   "Hsa-Mir-10-P2a_5p"  
-[6] "Hsa-Mir-193-P1b_5p*" "Hsa-Mir-193-P1b_3p" 
 
 ```{r}
-mirna_names_down <- c("hsa-miR-146b-5p", "hsa-miR-425-3p", "hsa-miR-125b-5p", "hsa-miR-193a-5p", "hsa-miR-193a-3p")
-converted_mirna_down <- miRNAVersionConvert(mirna_names_down)
-converted_mirna_down
+converted_up_humoral <- miRNAVersionConvert(rownames(up_humoral))
+converted_up_humoral
 ```
 **Запрос таргетов из базы multiMiR** 
 ```{r}
-targets_humoral_down <- unique(get_multimir(org = "hsa", mirna = converted_mirna_down$Accession, table = "validated")@data$target_symbol)
+targets_humoral_down <- unique(get_multimir(org = "hsa", mirna = converted_up_humoral$Accession, table = "validated")@data$target_symbol)
 #writeLines(targets_down, "targets_down150_list.txt")
 ```
 **Анализ обогащения из базы биологических процессов**
@@ -400,7 +393,7 @@ GO_enrich_down_humoral_bp <- enrichGO(
   gene          = targets_humoral_down,  
   OrgDb         = org.Hs.eg.db,
   keyType       = "SYMBOL",
-  ont           = "BP", 
+  ont           = "MF", 
   pAdjustMethod = "BH",
   qvalueCutoff  = 0.05
 )
@@ -413,7 +406,7 @@ p1 <- dotplot(GO_enrich_down_humoral_bp, showCategory = 20) +
   ggtitle("GO Enrichment for DOWNregulated targets") + 
   theme(
     plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 11)
+    axis.text.y = element_text(size = 20)
   )
 
 p1
@@ -434,11 +427,55 @@ plt <- emapplot(GO_enrich_DOWN_humoral_BP,
 
 plt
 
-ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_DOWN_humoral_BP.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_down_humoral_BP.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+```{r}
+GO_enrich_down_humoral_bp@result$Description[1:20]
+```
+## Возможный биологический смысл
+
+*Cadherin binding, actin binding, tubulin binding*
+Кадгерины и актин-ассоциированные белки участвуют в поддержании целостности эндотелия сосудов. Гуморальное отторжение вызывает повреждение эндотелия, воспаление и дестабилизацию межклеточных контактов, что может объяснить даунрегуляцию этих путей.
+*GTPase binding, small GTPase binding, GTPase regulator activity, nucleoside-triphosphatase regulator activity*
+GTPазы, такие как Rho, Rac, Cdc42, участвуют в регуляции эндотелиальной функции, миграции клеток и ремоделировании сосудов. Их подавление может указывать на:
+	•	Ослабление клеточного ответа на воспаление
+	•	Нарушение ангиогенеза
+	•	Подавление реорганизации цитоскелета
+*DNA-binding transcription factor binding, RNA polymerase II-specific DNA-binding transcription factor binding, transcription coregulator binding, transcription coactivator activity, transcription corepressor activity*
+	•	Это ключевые регуляторы иммунного ответа, репарации тканей и ангиогенеза.
+	•	Их подавление может указывать на глобальное снижение транскрипционной активности в повреждённых тканях.
+Cвязь с гуморальным отторжением:
+	•	В острую фазу происходит активация NF-κB, STAT1, IRF1 → но в хроническую фазу транскрипционная активность падает из-за повреждения эндотелия и истощения клеточного ответа.
+*Ubiquitin protein ligase binding, ubiquitin-like protein ligase binding, ubiquitin-like protein transferase activity, ubiquitin-like protein binding, ubiquitin-protein transferase activity*
+Убиквитин-протеасомная система (UPS) регулирует деградацию повреждённых белков, иммунный ответ, контроль за уровнем сигнальных молекул (например, NF-κB)
+Даунрегуляция может означать:
+	•	Снижение адаптивного ответа клетки на стресс
+	•	Аномальное накопление белков → что может приводить к дисфункции эндотелия
+UPS важна для регуляции воспалительного ответа → если она подавлена, то это может способствовать хроническому воспалению и фиброзу.
+*Protein serine/threonine kinase activity, protein serine kinase activity*
+	•	Включает ключевые сигнальные молекулы MAPK, AKT, mTOR
+	•	Подавление их активности может отражать дисфункцию клеточного ответа и метаболические изменения
+	•	Подавление mTOR-сигналинга может ослаблять пролиферацию эндотелиальных клеток, способствуя прогрессии сосудистого ремоделирования.
+
+```{r}
+msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG")
+
+
+GO_enrich_down_bp_KEGG <- enricher(gene = targets_humoral_down, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
+
+plt <- dotplot(GO_enrich_down_bp_KEGG, showCategory = 20) + 
+  ggtitle("GO Enrichment for DOWNregulated targets") + 
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.text.y = element_text(size = 12)
+  )
+
+plt
+ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_down_humoral_KEGG.tiff", plot = p1, width = 16, height = 10, dpi = 300)
 ```
 ##Клеточное отторжение
 ```{r}
-res_cellular <- results(dds, contrast=c("condition", "no_complications", "cellular"))
+res_cellular <- results(dds, contrast=c("condition", "cellular", "no_complications"))
 res_cellular
 ```
 **MA plot**
@@ -478,7 +515,7 @@ ggsave("./pictures_transpl/transpl_Сustom MAplot_cellular.tiff", plot = plt, wi
 ```
 **БКAПC**
 ```{r}
-res_TCAD <- results(dds, contrast=c("condition", "no_complications", "TCAD"))
+res_TCAD <- results(dds, contrast=c("condition", "TCAD", "no_complications"))
 res_TCAD
 ```
 
@@ -517,7 +554,7 @@ ggsave("./pictures_transpl/transpl_Сustom_MAplot_TCAD.tiff", plot = plt, width 
 ```
 **Значимые результаты**
 ```{r}
-signres_TCAD <- results(dds, contrast=c("condition", "no_complications", "TCAD"), alpha=0.05) 
+signres_TCAD <- results(dds, contrast=c("condition", "TCAD", "no_complications"), alpha=0.05) 
 summary(signres_TCAD)
 ```
 **Volcano plot**
@@ -538,6 +575,29 @@ plt <- EnhancedVolcano(res_TCAD,
 plt
 ggsave("./pictures_transpl/transpl_VolcanoPlot_TCAD.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
+```{r}
+gene_idx <- which.min(res_TCAD$padj)
+gene_name <- rownames(res_TCAD)[gene_idx]  
+
+# selected_miRNA <- "hsa-miR-193b-5p"
+# 
+# gene_idx <- which(rownames(res_humoral) == selected_miRNA)
+# gene_name <- rownames(res_humoral)[gene_idx] 
+  
+count_data <- plotCounts(dds, gene=gene_idx, intgroup="condition", returnData=TRUE)
+count_data$sample <- gsub("_.*", "", rownames(count_data))  
+
+plt <- ggplot(count_data, aes(x=condition, y=count, fill=condition)) +
+  geom_boxplot(alpha=0.5) +
+  geom_text(aes(label=sample), size=3, vjust=-1) + 
+  geom_jitter(width=0.2, size=2, alpha=0.7) +
+  scale_y_log10() +
+  ggtitle(paste("Expression of", gene_name)) +
+  theme_minimal()
+
+plt
+ggsave("./pictures_transpl/transpl_boxplots_TCAD_hsa-miR-582-3p.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
 **Анализ обогащения TCAD**
 ```{r}
 res_sign_TCAD <- subset(res_TCAD, padj < 0.05 & !is.na(padj) & abs(log2FoldChange) > 1.0)
@@ -545,19 +605,20 @@ res_sign_TCAD <- subset(res_TCAD, padj < 0.05 & !is.na(padj) & abs(log2FoldChang
 up_TCAD <- res_sign_TCAD %>% 
   as.data.frame() %>% 
   filter(log2FoldChange > 0)
-
+down_TCAD <- res_sign_TCAD %>% 
+  as.data.frame() %>% 
+  filter(log2FoldChange < 0)
 rownames(up_TCAD)
+rownames(down_TCAD)
 ```
 
 ```{r}
-mirna_names_up <- "hsa-miR-582-3p"
-converted_mirna_up <- miRNAVersionConvert(mirna_names_up)
-converted_mirna_up
+converted_down_TCAD <- miRNAVersionConvert(rownames(down_TCAD))
+converted_down_TCAD
 ```
 **Запрос таргетов из базы multiMi**
 ```{r}
-targets_TCAD_up <- unique(get_multimir(org = "hsa", mirna = converted_mirna_down$Accession, table = "validated")@data$target_symbol)
-targets_TCAD_up
+targets_TCAD_up <- unique(get_multimir(org = "hsa", mirna = converted_down_TCAD$Accession, table = "validated")@data$target_symbol)
 ```
 **Анализ обогащения из базы биологических процессов**
 ```{r}
@@ -569,20 +630,39 @@ GO_enrich_up_TCAD_bp <- enrichGO(
   pAdjustMethod = "BH",
   qvalueCutoff  = 0.05
 )
-```
-**Визуализация**
-```{r}
+
 p1 <- dotplot(GO_enrich_up_TCAD_bp, showCategory = 20) + 
   ggtitle("GO Enrichment for UPregulated targets TCAD") + 
   theme(
     plot.title = element_text(size = 12, face = "bold"),
-    axis.text.y = element_text(size = 11)
+    axis.text.y = element_text(size =20)
   )
 
 p1
 
 ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_up_TCAD_bp.tiff", plot = p1, width = 16, height = 10, dpi = 300)
 ```
+*RNA splicing, regulation of RNA splicing, mRNA splicing via spliceosome, regulation of mRNA processing*
+	•	Гипоксия и оксидативный стресс → изменённый сплайсинг проапоптотических и пролиферативных генов (например, Bcl-x, VEGF).
+	•	Дисфункция эндотелия → активация факторов, регулирующих сплайсинг (SRSF1, hnRNP).
+
+*Wnt signaling pathway, canonical Wnt signaling pathway, regulation of Wnt signaling pathway, cell-cell signaling by Wnt*
+	•	Wnt участвует в ангиогенезе, регенерации тканей и фиброзе.
+	•	Хроническое повреждение эндотелия требует ремоделирования сосудов.
+	•	гипоксия и воспаление вызывают переключение Wnt на про-фибротический режим → стимулируется экспансия гладкомышечных клеток и утолщение интимы сосудов.
+
+*RNA localization, establishment of RNA localization*
+	•	Стабильность мРНК важна для пролонгированного ответа на стресс.
+	•	Воспаление вызывает сортировку мРНК к определённым компартментам клетки (например, к стрессовым гранулам).
+	•	Увеличивается локализация мРНК VEGF в эндотелиальных клетках → усиленный ангиогенез.
+	•	Перенос мРНК воспалительных медиаторов (TNF-α, IL-6) → хроническая иммунная активация.
+
+*Osteoblast differentiation, in utero embryonic development*
+	•	Почему активируется?
+	•	При хроническом повреждении гладкомышечные клетки сосудов переходят в остеобластоподобные клетки → это вызывает кальцификацию сосудов.
+	•	Аналогичные процессы происходят при хроническом воспалении и оксидативном стрессе.
+	•	Wnt участвует в кальцификации сосудов трансплантата.
+	•	Гипоксия стимулирует проостеогенные сигналы, активируя BMP-2 и RUNX2.
 
 ```{r}
 GO_enrich_UP_TCAD_bp <- enrichplot::pairwise_termsim(GO_enrich_up_TCAD_bp, method = "JC")
@@ -598,5 +678,58 @@ plt <- emapplot(GO_enrich_UP_TCAD_bp,
 
 plt
 
-ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_up_TCAD_BP.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_UP_TCAD_BP.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
+```{r}
+GO_enrich_up_TCAD_bp@result$Description[1:20]
+```
+
+1. C1 (Genomic Signature Prediction)
+	•	Включает генетические сигнатуры, которые используются для предсказания различных фенотипов или состояний, основанных на генетической информации. 299
+2. C2 (Curated Gene Sets)
+	•	CGP: Gene sets curated for cancer genomics 3384
+	•	CP: Gene sets curated for canonical pathways  29
+	•	CP:BIOCARTA: 292
+	•	CP:KEGG: 186
+	•	CP:PID: Pathway Interaction Database 196
+	•	CP:REACTOME: 1615
+	•	CP:WIKIPATHWAYS: 664
+3. C3 (Motif and Transcription Factor Gene Sets)
+	•	MIR:MIRDB: Наборы микроРНК из базы данных MIRDB.  2377
+	•	MIR_Legacy: Старые наборы микроРНК.  221
+	•	TFT:GTRD: Наборы генов, связанные с факторами транскрипции из GTRD (Gene Transcription Regulation Database).  518
+	•	TFT:TFT_Legacy: Старые наборы факторов транскрипции. 610
+4. C4 (Computational Gene Sets)
+	•	CGN: Наборы генов, связанные с компьютерными моделями или системами. 427
+	•	CM: Математические или вычислительные модели для анализа данных генетики. 431
+5. C5 (Gene Ontology Gene Sets)
+	•	GO:BP: Наборы генов, связанные с биологическими процессами (Biological Process). 7658
+	•	GO:CC: Наборы генов, связанные с клеточными компонентами (Cellular Component).  1006
+	•	GO:MF: Наборы генов, связанные с молекулярной функции (Molecular Function). 1738
+	•	HPO: Наборы генов, связанные с фенотипами, описанными в Human Phenotype Ontology. 5071
+6. C6 (Oncogenic Signatures)
+	•	Включает наборы генов, связанные с онкогенами и раковыми клетками. 189
+7. C7 (Immunologic Signature Gene Sets)
+	•	IMMUNESIGDB: Наборы генов, связанные с иммунной системой, включая иммуно-онкологию и другие аспекты иммунитета.  4872
+	•	VAX: Наборы генов, связанные с вакцинацией. 347
+8. C8 (Cell Type Signature Gene Sets)
+	•	Наборы генов, ассоциированные с различными типами клеток 700
+9. H (Hallmark Gene Sets)
+	•	Включает Hallmark Gene Sets, которые представляют ключевые биологические процессы и функции, общие для множества типов клеток и состояний. 50
+
+```{r}
+msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG")
+
+
+GO_enrich_up_TCAD_KEGG <- enricher(gene = targets_TCAD_up, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
+
+plt <- dotplot(GO_enrich_up_TCAD_KEGG, showCategory = 20) +
+  ggtitle("GO Enrichment for UPregulated targets") +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.text.y = element_text(size = 12)
+  )
+plt
+ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_UP_TCAD_KEGG.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+
