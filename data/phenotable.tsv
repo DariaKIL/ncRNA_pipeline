@@ -1,30 +1,30 @@
-sample	condition
-105_S1_R1_001	no_complications
-197_S2_R1_001	no_complications
-149_S3_R1_001	humoral
-166_S4_R1_001	cellular
-144_S5_R1_001	TCAD
-093_S6_R1_001	TCAD
-135_S7_R1_001	TCAD
-128_S8_R1_001	no_complications
-109_S9_R1_001	no_complications
-187_S10_R1_001	no_complications
-125_S11_R1_001	no_complications
-075_S12_R1_001	humoral
-059_S13_R1_001	humoral
-164_S14_R1_001	cellular
-124_S16_R1_001	cellular
-103_S17_R1_001	cellular
-019_S18_R1_001	cellular
-062_S19_R1_001	cellular
-123_S20_R1_001	TCAD
-033_S21_R1_001	TCAD
-192_S22_R1_001	humoral
-167_S23_R1_001	TCAD
-121_S24_R1_001	TCAD
-182_S25_R1_001	humoral
-179_S26_R1_001	humoral
-112_S27_R1_001	no_complications
-106_S28_R1_001	no_complications
-127_S29_R1_001	humoral
-138_S30_R1_001	no_complications
+sample	condition	group
+105_S1_R1_001	no_complications	non_reject
+197_S2_R1_001	no_complications	
+149_S3_R1_001	humoral	reject
+166_S4_R1_001	cellular	reject
+144_S5_R1_001	TCAD	
+093_S6_R1_001	TCAD	
+135_S7_R1_001	TCAD	
+128_S8_R1_001	no_complications	non_reject
+109_S9_R1_001	no_complications	non_reject
+187_S10_R1_001	no_complications	non_reject
+125_S11_R1_001	no_complications	non_reject
+075_S12_R1_001	humoral	
+059_S13_R1_001	humoral	
+164_S14_R1_001	cellular	
+124_S16_R1_001	cellular	reject
+103_S17_R1_001	cellular	reject
+019_S18_R1_001	cellular	
+062_S19_R1_001	cellular	
+123_S20_R1_001	TCAD	
+033_S21_R1_001	TCAD	
+192_S22_R1_001	humoral	
+167_S23_R1_001	TCAD	
+121_S24_R1_001	TCAD	
+182_S25_R1_001	humoral	
+179_S26_R1_001	humoral	reject
+112_S27_R1_001	no_complications	non_reject
+106_S28_R1_001	no_complications	non_reject
+127_S29_R1_001	humoral	reject
+138_S30_R1_001	no_complications	non_reject

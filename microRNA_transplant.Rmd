@@ -31,7 +31,7 @@ library(dbplyr)
 ## Импортируем данные
 ```{r}
 coldata <- read_tsv("data/phenotable.tsv", show_col_types = FALSE)
-rownames(coldata) <- coldata$sample
+coldata$group <- NULL  
 coldata
 ```
 
@@ -48,7 +48,7 @@ phenotable_samples <- coldata$sample
 common_samples <- intersect(counts_samples, phenotable_samples)
 
 counts <- counts[, c(counts$miRNA, common_samples)]  
-counts <- counts[, rownames(coldata)] #ранжирую по колонки в counts так же как и названия строк в coldata
+counts <- counts[, coldata$sample] #ранжирую по колонки в counts так же как и названия строк в coldata
 head(counts)
 ```
 ```{r}
@@ -398,7 +398,7 @@ GO_enrich_down_humoral_bp <- enrichGO(
   gene          = targets_humoral_down,  
   OrgDb         = org.Hs.eg.db,
   keyType       = "SYMBOL",
-  ont           = "MF", 
+  ont           = "BP", 
   pAdjustMethod = "BH",
   qvalueCutoff  = 0.05
 )
@@ -736,4 +736,5 @@ plt <- dotplot(GO_enrich_up_TCAD_KEGG, showCategory = 20) +
 plt
 ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_UP_TCAD_KEGG.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
+
 
