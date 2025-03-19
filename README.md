@@ -8,7 +8,7 @@
 - [MicroRNA in Heart Transplants](https://DariaKIL.github.io/Micro-RNA_cardiology/microRNA_transplant.nb.html)  
   [Картинки MicroRNA in Heart Transplants](https://github.com/DariaKIL/Micro-RNA_cardiology/tree/main/pictures_transpl)
 
-- [Здесь сравнение между группами 2 и 5](https://DariaKIL.github.io/Micro-RNA_cardiology/microRNA_transplant_1-5years.nb.html)  
+- [Здесь отдельно сравнение Heart Transplants между группами 2 и 5](https://DariaKIL.github.io/Micro-RNA_cardiology/microRNA_transplant_1-5years.nb.html)  
   [Картинки](https://github.com/DariaKIL/Micro-RNA_cardiology/tree/main/pictures_transpl2)
 
 - [tRNA in Vesicles](https://DariaKIL.github.io/Micro-RNA_cardiology/tRNA_vesicles.nb.html)  
