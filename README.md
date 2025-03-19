@@ -1,6 +1,7 @@
 # Micro-RNA in Cardiology
 
-### 📊 Визуализация
+### 📊 Визуализация   
+(графики с GO обогащением выглядят ужасно, но их можно скачать в хорошем разрешении по ссылке с картинками)
 
 - [MicroRNA in Vesicles](https://DariaKIL.github.io/Micro-RNA_cardiology/microRNA_vesicles.nb.html)  
   [Картинки MicroRNA in Vesicles](https://github.com/DariaKIL/Micro-RNA_cardiology/tree/main/pictures)
