@@ -2,6 +2,7 @@
 title: "tRNA Vesicles"
 output:
   html_notebook: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -104,8 +105,6 @@ ggplot(df, aes(x = Sample, y = Counts, fill = Type)) +
   theme_minimal() +
   labs(title = "Counts before and after normalization", x = "Sample", y = "Total Counts") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-
 ```
 **rlog трансформация**
 
@@ -120,7 +119,6 @@ ggplot(df, aes(x = Sample, y = Counts, fill = Type)) +
 ```{r}
 rlt <- rlog(dds)  #rlog Transformation
 meanSdPlot(assay(rlt)) 
-
 ```
 **vsd трансформация**
 ```{r}
@@ -165,29 +163,6 @@ plt <- ggplot(pcaData, aes(PC1, PC2, shape = patient, color = condition_type)) +
 plt
 ggsave("./pictures_tRNA_vesicles/PCA plot for all dataset after removing donor effect.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
-```{r}
-# pcs_count <- 4  # Количество главных компонент
-# pca_result <- prcomp(t(assay(rlt)), center = TRUE, scale. = TRUE) 
-# 
-# # Достаем объяснённую дисперсию
-# explained_variance_ratio <- pca_result$sdev^2 / sum(pca_result$sdev^2)
-# 
-# # Преобразуем в датафрейм
-# miRNA_pca_df <- as.data.frame(pca_result$x[, 1:pcs_count])  
-# colnames(miRNA_pca_df) <- paste0("PC", 1:pcs_count, " (", round(explained_variance_ratio[1:pcs_count] * 100, 2), "%)")
-# 
-# # Добавляем группы
-# miRNA_pca_df$Group <- paste(coldata$condition, coldata$type, sep = "_")
-# 
-# # Аналог sns.pairplot - ggpairs()
-# ggpairs(
-#   miRNA_pca_df, aes(color = Group, alpha = 0.7)
-# ) +
-#   ggtitle("PCA Plot of miRNAs dataset, colored by group")
-```
-
-
-
 **Plot a heatmap of 50 most expressed genes**
 Этот heatmap отражает уровни экспрессии генов, а не разницу между группами.
 Цвета не означают up- или down-регуляцию в сравнении с контрольной группой, потому что heatmap показывает абсолютные значения экспрессии, а не fold change!
@@ -315,9 +290,7 @@ ggsave("./pictures_tRNA_vesicles/Сustom MAplot_type150.tiff", plot = plt, width
 
 **Visualisation for gene with min padj**
 ```{r}
-#plotCounts(dds_150, gene=which.max(res_150$log2FoldChange), intgroup="condition")
 plotCounts(dds_150, gene=which.min(res_150$padj), intgroup="condition")
-#plotCounts(dds, gene=rownames(res)[which.min(res$padj[which.max(res$log2FoldChange)])], intgroup="condition")
 ```
 **Volcano plot**
 ```{r}
@@ -585,7 +558,7 @@ ggplot(pcaData, aes(PC1, PC2, shape = patient, color = condition)) +
   scale_color_brewer(palette = "Set2")
 ```
 
-
+**PCA plot, type 16 after removing donor effect**
 ```{r}
 assay(rlt_16) <- limma::removeBatchEffect(assay(rlt_16),
                                        batch = colData(dds_16)[,'patient'])
@@ -604,10 +577,7 @@ plt <- ggplot(pcaData, aes(PC1, PC2, shape = patient, color = condition)) +
 plt
 ggsave("./pictures_tRNA_vesicles/PCA plot for type 16 after removing donor effect.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
-
-
 **Plot a heatmap of the most expressed genes**
-
 ```{r}
 res_sign_16 <- subset(res_16, pvalue < 0.05 & !is.na(pvalue) & abs(log2FoldChange) > 1.0)
 res_sign_16 <- res_sign_16[order(res_sign_16$log2FoldChange, decreasing = TRUE), ]
@@ -638,14 +608,11 @@ plt <- pheatmap(datamatrix,
 plt
 ggsave("./pictures_tRNA_vesicles/Heatmap of diff expressed genes_type16.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
-
-
 **Plot of the distance between samples heatmap**
 Расчет расстояний между образцами
 	•	Обычно используется евклидово расстояние (по умолчанию в DESeq2).
 	•	Оно вычисляется по нормализованным данным экспрессии (rlog() или vst()).
 	•	Чем меньше расстояние — тем более похожи образцы.
-
 ```{r}
 sampleDists_16 <- dist(t(assay(rlt_16)))
 sampleDistMatrix_16 <- as.matrix(sampleDists_16)
@@ -663,4 +630,3 @@ plt <- pheatmap(sampleDistMatrix_16,
 plt
 ggsave("./pictures_tRNA_vesicles/Plot of the distance between samples_type16.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
-
