@@ -4,7 +4,11 @@ output:
   html_notebook: default
 ---
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE) 
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
 ```
 
 **Устанавливаем необходимые библиотки**

@@ -5,10 +5,13 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE) 
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
 ```
 
-**Устанавливаем необходимые библиотки**
 ```{r}
 library(tidyverse)
 library(DESeq2)
@@ -28,18 +31,21 @@ library(rvest)
 library(patchwork)
 library(dbplyr)
 ```
-## Импортируем данные
+## Импортируем данные ##
+**Таблица фенотипов:**
 ```{r}
+setwd("/Users/dariakilina/GitHub/Micro-RNA_cardiology")
 coldata <- read_tsv("data/phenotable.tsv", show_col_types = FALSE)
 coldata$group <- NULL  
 coldata
 ```
-
+**Таблица каунтов:**
 ```{r}
 counts <- read.csv("data/miR.Counts.csv", header = TRUE, sep = ",")
 counts <- column_to_rownames(counts, var = "miRNA")
 head(counts)
 ```
+**Таблица каунтов только для выбранных образцов:**
 ```{r}
 colnames(counts) <- gsub("^X", "", colnames(counts))
 
@@ -51,16 +57,15 @@ counts <- counts[, c(counts$miRNA, common_samples)]
 counts <- counts[, coldata$sample] #ранжирую по колонки в counts так же как и названия строк в coldata
 head(counts)
 ```
+**Аnnotation report:**
 ```{r}
 anno <- read.csv("data/annotation.report.csv", header = TRUE, sep = ",")
-anno$Sample.name.s. <- gsub("-", ".", anno$Sample.name.s.)
 anno <- anno[, -c(2:5, 7, 15)]
-
-
+ 
 common_samples <- intersect(anno$Sample.name.s., coldata$sample)
 
 anno <- anno[anno$Sample.name.s. %in% common_samples, ]
-anno <- anno[match(rownames(coldata), anno$Sample.name.s.), ] #ранжирую по колонки в counts так же как и названия строк в coldata
+anno <- anno[match(coldata$sample, anno$Sample.name.s.), ] #ранжирую по колонки в counts так же как и названия строк в coldata
 anno
 ```
 ## Весь датасет
@@ -96,6 +101,7 @@ plt <- ggplot(anno_long, aes(x = Sample.name.s., y = Proportion, fill = RNA_Type
 plt
 ggsave("./pictures_transpl/transpl_barplot_alldataset_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
+**Матрица для анализа дифференциальной экспрессии:**
 ```{r}
 coldata$condition <- relevel(factor(coldata$condition), ref = "no_complications")
 modelMatrix <- model.matrix(~condition, coldata)
@@ -104,12 +110,13 @@ qr(modelMatrix)$rank  # ранг матрицы
 ncol(modelMatrix) 
 ```
 
-
+**Создание DESeqDataSet:**
 ```{r}
 dds <- DESeqDataSetFromMatrix(countData = counts, colData = coldata, design = ~ condition)
 dds$condition <- relevel(dds$condition, ref = "no_complications")
 dds
 ```
+**Фильтрация датасета:**
 ```{r}
 dim(dds)
 smallestGroupSize <- 15
@@ -126,6 +133,7 @@ dds
 ```{r}
 plotDispEsts(dds)
 ```
+**График нормализации каунтов**
 ```{r}
 raw_counts <- counts(dds, normalized = FALSE)
 normalized_counts <- counts(dds, normalized = TRUE)
@@ -145,18 +153,28 @@ plt <- ggplot(df, aes(x = Sample, y = Counts, fill = Type)) +
 plt
 ggsave("./pictures_transpl/transpl_Counts before and after normalization.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
-rlog трансформация
+**rlog трансформация**
+
+- Позволяет стабилизировать дисперсию (разброс значений), особенно для генов с низким уровнем экспрессии.  
+- Преобразует данные в логарифмическую шкалу, но с регуляризацией, чтобы избежать сильного влияния малых значений. 
+
+	•	Ось X: среднее количество прочтений (reads).  
+	•	Ось Y: стандартное отклонение (разброс значений экспрессии).  
+
+	•	График должен показывать почти горизонтальную линию, то есть SD не зависит от среднего выражения.  
+	•	Это значит, что трансформация успешно стабилизировала дисперсию, что делает данные более пригодными для дальнейшего анализа.  
 ```{r}
 rlt <- rlog(dds)  #rlog Transformation
 meanSdPlot(assay(rlt)) 
 
 ```
+**rlog трансформация**
 ```{r}
 vsd <- varianceStabilizingTransformation(dds, blind=FALSE) 
 meanSdPlot(assay(vsd)) #показывает, как изменяется стандартное отклонение в зависимости от среднего значения экспрессии
 ```
 
-** PCA plot **
+**PCA plot**
 ```{r}
 pcaData <- plotPCA(rlt, intgroup=c("condition"), returnData = TRUE)
 percentVar <- round(100 * attr(pcaData, "percentVar"))
@@ -215,6 +233,9 @@ plt <- pheatmap(sampleDistMatrix,
 plt
 ggsave("./pictures_transpl/transpl_Plot of the distance between samples heatmap.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
+## Гуморальное отторжение ##
+
+**Результаты анализа диф экспресии с контрастом "humoral" VS "no_complications"**
 ```{r}
 res_humoral <- results(dds, contrast=c("condition", "humoral", "no_complications"))
 res_humoral
@@ -268,13 +289,13 @@ Let's arranged it by log2FoldChange:
 order_indices <- order(-res_humoral$log2FoldChange)
 res_humoral[order_indices, ]
 ```
-Visualisation for the first gene
+**Visualisation for the first gene**
 ```{r}
 #plotCounts(dds, gene=which.max(res_humoral$log2FoldChange), intgroup="condition")
 plotCounts(dds, gene=which.min(res_humoral$padj), intgroup="condition")
 #plotCounts(dds, gene=rownames(res)[which.min(res$padj[which.max(res$log2FoldChange)])], intgroup="condition")
 ```
-*Визуализация в виде боксплотов *
+**Визуализация в виде боксплотов**
 hsa-miR-193b-5p
 hsa-miR-1468-5p
 hsa-miR-5588-5p
@@ -363,7 +384,7 @@ ggsave("./pictures_transpl/transpl_Heatmap of diff expressed genes_humoral.tiff"
 ```
 
 
-### Анализ обогащения гуморальный ответ ###
+### Анализ обогащения гуморальное отторжение###
 ```{r}
 up_humoral <- res_sign_humoral %>% 
   as.data.frame() %>% 
@@ -374,11 +395,7 @@ down_humoral <- res_sign_humoral %>%
 rownames(up_humoral)
 rownames(down_humoral)
 ```
-
-
 **Конвертация в MIMATID** 
-
-
 ```{r}
 converted_up_humoral <- miRNAVersionConvert(rownames(up_humoral))
 converted_up_humoral
@@ -437,30 +454,23 @@ ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_down_humoral_BP.tiff",
 ```{r}
 GO_enrich_down_humoral_bp@result$Description[1:20]
 ```
-## Возможный биологический смысл
+**Возможный биологический смысл**
+*“Cell growth”, “Regulation of cell growth”, “Regulation of cell cycle phase transition”, “Mitotic nuclear division”, “DNA replication”, “Sister chromatid segregation”*  
+Гуморальное отторжение сопровождается воспалением и повреждением эндотелия сосудов трансплантата. В таких условиях наблюдается угнетение пролиферации клеток, особенно в эндотелии и кардиомиоцитах, из-за оксидативного стресса, цитокинового шторма и нарушения микроциркуляции.
 
-*Cadherin binding, actin binding, tubulin binding*. 
-Кадгерины и актин-ассоциированные белки участвуют в поддержании целостности эндотелия сосудов. Гуморальное отторжение вызывает повреждение эндотелия, воспаление и дестабилизацию межклеточных контактов, что может объяснить даунрегуляцию этих путей.  
-*GTPase binding, small GTPase binding, GTPase regulator activity, nucleoside-triphosphatase regulator activity*. 
-GTPазы, такие как Rho, Rac, Cdc42, участвуют в регуляции эндотелиальной функции, миграции клеток и ремоделировании сосудов. Их подавление может указывать на:  
-	•	Ослабление клеточного ответа на воспаление. 
-	•	Нарушение ангиогенеза. 
-	•	Подавление реорганизации цитоскелета. 
-*DNA-binding transcription factor binding, RNA polymerase II-specific DNA-binding transcription factor binding, transcription coregulator binding, transcription coactivator activity, transcription corepressor activity*. 
-	•	Это ключевые регуляторы иммунного ответа, репарации тканей и ангиогенеза.  
-	•	Их подавление может указывать на глобальное снижение транскрипционной активности в повреждённых тканях.  
-Cвязь с гуморальным отторжением:  
-	•	В острую фазу происходит активация NF-κB, STAT1, IRF1 → но в хроническую фазу транскрипционная активность падает из-за повреждения эндотелия и истощения клеточного ответа.  
-*Ubiquitin protein ligase binding, ubiquitin-like protein ligase binding, ubiquitin-like protein transferase activity, ubiquitin-like protein binding, ubiquitin-protein transferase activity*
-Убиквитин-протеасомная система (UPS) регулирует деградацию повреждённых белков, иммунный ответ, контроль за уровнем сигнальных молекул (например, NF-κB). 
-Даунрегуляция может означать:  
-	•	Снижение адаптивного ответа клетки на стресс. 
-	•	Аномальное накопление белков → что может приводить к дисфункции эндотелия. 
-UPS важна для регуляции воспалительного ответа → если она подавлена, то это может способствовать хроническому воспалению и фиброзу.  
-*Protein serine/threonine kinase activity, protein serine kinase activity*. 
-	•	Включает ключевые сигнальные молекулы MAPK, AKT, mTOR. 
-	•	Подавление их активности может отражать дисфункцию клеточного ответа и метаболические изменения. 
-	•	Подавление mTOR-сигналинга может ослаблять пролиферацию эндотелиальных клеток, способствуя прогрессии сосудистого ремоделирования.  
+*“Proteasome-mediated ubiquitin-dependent protein catabolic process”, “Regulation of protein catabolic process”*. 
+Убиквитин-протеасомная система играет важную роль в удалении поврежденных и неправильно свернутых белков. Ее угнетение может привести к накоплению аномальных белков и усилению клеточного стресса, что ухудшает состояние трансплантата.
+
+*“Nucleocytoplasmic transport”, “Nuclear transport”*. 
+Активный ядерно-цитоплазматический транспорт необходим для правильного функционирования транскрипционных факторов и регуляции стрессовых ответов. Его снижение может указывать на нарушение клеточной регуляции в условиях воспаления.
+
+*“Axonogenesis”, “Regulation of neuron projection development”, “Dendrite development”*. 
+Могут быть связаны с регенерацией и реорганизацией нервных окончаний в сердечной ткани или с вовлечением паракринных факторов в воспалительный процесс.
+
+*“Regulation of chromosome organization”, “Chromosome segregation”, “Mitotic cell cycle phase transition”*. 
+Отторжение трансплантата сопровождается повышенной иммунной атакой, что может приводить к повреждению ДНК и нестабильности хромосом в клетках трансплантата.
+
+**Визуализация путей KEGG**
 
 ```{r}
 msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG")
@@ -478,7 +488,7 @@ plt <- dotplot(GO_enrich_down_bp_KEGG, showCategory = 20) +
 plt
 ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_down_humoral_KEGG.tiff", plot = p1, width = 16, height = 10, dpi = 300)
 ```
-##Клеточное отторжение
+## Клеточное отторжение ##
 ```{r}
 res_cellular <- results(dds, contrast=c("condition", "cellular", "no_complications"))
 res_cellular
@@ -518,7 +528,7 @@ plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
 plt
 ggsave("./pictures_transpl/transpl_Сustom MAplot_cellular.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
-**БКAПC**
+## БКAПC ##
 ```{r}
 res_TCAD <- results(dds, contrast=c("condition", "TCAD", "no_complications"))
 res_TCAD
@@ -532,7 +542,7 @@ plotMA(res_TCAD, alpha = 0.05, ylim = c(-8, 8))
 dev.off()
 plotMA(res_TCAD, alpha = 0.05, ylim = c(-8, 8)) 
 ```
-## Кастомный MA plot
+**Кастомный MA plot**
 ```{r}
 res_df <- res_TCAD %>%
   as.data.frame() %>%
@@ -688,6 +698,24 @@ ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_UP_TCAD_BP.tiff", plot
 GO_enrich_up_TCAD_bp@result$Description[1:20]
 ```
 
+
+**Визуализация путей KEGG**
+```{r}
+msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG")
+
+
+GO_enrich_up_TCAD_KEGG <- enricher(gene = targets_TCAD_up, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
+
+plt <- dotplot(GO_enrich_up_TCAD_KEGG, showCategory = 20) +
+  ggtitle("GO Enrichment for UPregulated targets") +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.text.y = element_text(size = 12)
+  )
+plt
+ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_UP_TCAD_KEGG.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+
 1. C1 (Genomic Signature Prediction)
 	•	Включает генетические сигнатуры, которые используются для предсказания различных фенотипов или состояний, основанных на генетической информации. 299
 2. C2 (Curated Gene Sets)
@@ -720,21 +748,3 @@ GO_enrich_up_TCAD_bp@result$Description[1:20]
 	•	Наборы генов, ассоциированные с различными типами клеток 700
 9. H (Hallmark Gene Sets)
 	•	Включает Hallmark Gene Sets, которые представляют ключевые биологические процессы и функции, общие для множества типов клеток и состояний. 50
-
-```{r}
-msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG")
-
-
-GO_enrich_up_TCAD_KEGG <- enricher(gene = targets_TCAD_up, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
-
-plt <- dotplot(GO_enrich_up_TCAD_KEGG, showCategory = 20) +
-  ggtitle("GO Enrichment for UPregulated targets") +
-  theme(
-    plot.title = element_text(size = 14, face = "bold"),
-    axis.text.y = element_text(size = 12)
-  )
-plt
-ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_UP_TCAD_KEGG.tiff", plot = plt, width = 16, height = 10, dpi = 300)
-```
-
-
