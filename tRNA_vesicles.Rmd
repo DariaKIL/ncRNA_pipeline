@@ -652,6 +652,6 @@ plt <- pheatmap(sampleDistMatrix_16,
          color = colors)
 
 plt
-ggsave("./pictures/Plot of the distance between samples_type16.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_tRNA_vesicles/Plot of the distance between samples_type16.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 
