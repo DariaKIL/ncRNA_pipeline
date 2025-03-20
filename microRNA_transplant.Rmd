@@ -31,7 +31,7 @@ library(rvest)
 library(patchwork)
 library(dbplyr)
 ```
-## Импортируем данные ##
+### Импортируем данные ###
 **Таблица фенотипов:**
 ```{r}
 setwd("/Users/dariakilina/GitHub/Micro-RNA_cardiology")
