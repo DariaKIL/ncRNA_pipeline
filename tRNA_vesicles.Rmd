@@ -1,8 +1,8 @@
 ---
 title: "tRNA Vesicles"
 output:
-  html_notebook: default
   pdf_document: default
+  html_notebook: default
 ---
 
 ```{r setup, include=FALSE}

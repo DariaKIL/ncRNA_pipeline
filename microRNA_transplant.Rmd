@@ -30,6 +30,7 @@ library(vsn)
 library(rvest)
 library(patchwork)
 library(dbplyr)
+library(GGally) 
 ```
 ### Импортируем данные ###
 **Таблица фенотипов:**
@@ -68,7 +69,16 @@ anno <- anno[anno$Sample.name.s. %in% common_samples, ]
 anno <- anno[match(coldata$sample, anno$Sample.name.s.), ] #ранжирую по колонки в counts так же как и названия строк в coldata
 anno
 ```
-## Весь датасет
+```{r}
+merged_df <- left_join(anno, coldata, by = c("Sample.name.s." = "sample"))
+summed_anno <- merged_df %>%
+  group_by(condition) %>%
+  summarise(across(where(is.numeric), sum))
+summed_anno
+```
+
+
+**Весь датасет по семплам**
 ```{r}
 anno_long <- anno %>%
   pivot_longer(cols = -Sample.name.s., names_to = "RNA_Type", values_to = "Count")
@@ -101,6 +111,29 @@ plt <- ggplot(anno_long, aes(x = Sample.name.s., y = Proportion, fill = RNA_Type
 plt
 ggsave("./pictures_transpl/transpl_barplot_alldataset_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
+**Весь датасет по группам**
+```{r}
+# summed_anno_plt <- summed_anno %>%
+#   rowwise() %>%
+#   mutate(across(-condition, ~ . / sum(c_across(-condition)))) %>% 
+#   ungroup() %>%
+#   pivot_longer(cols = -condition, names_to = "RNA_Type", values_to = "Proportion")
+
+summed_anno_plt <- summed_anno %>%
+  pivot_longer(cols = -condition, names_to = "RNA_Type", values_to = "Count")
+
+plt <- ggplot(summed_anno_plt, aes(x = condition, y = Count, fill = RNA_Type)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(x = "Sample", y = "Proportion") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_brewer(palette = "Set3")
+
+plt
+ggsave("./pictures_transpl/transpl_barplot_alldataset_normalised_by groups.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+
+
 **Матрица для анализа дифференциальной экспрессии:**
 ```{r}
 coldata$condition <- relevel(factor(coldata$condition), ref = "no_complications")
@@ -193,7 +226,31 @@ plt <- ggplot(pcaData, aes(PC1, PC2, color = condition)) +
 plt
 ggsave("./pictures_transpl/transpl_PCA plot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
+**Попробовала сделать PCA c большим количеством компонент (но лучше не стало)**
+Хотя  PC2 vs PC4 их хотя бы вытащил из кучи
 
+Если боксплот для PC1 показывает, что одна группа имеет более широкий разброс значений, это значит, что эта группа более вариабельна по данной компоненте. Если боксплот очень узкий, значит, почти все образцы имеют схожие значения в этой компоненте.
+corr: коэффициент корреляции Пирсона между двумя главными компонентами 
+```{r}
+pcs_count <- 4  # Количество главных компонент
+pca_result <- prcomp(t(assay(rlt)), center = TRUE, scale. = TRUE)
+
+# Достаем объяснённую дисперсию
+explained_variance_ratio <- pca_result$sdev^2 / sum(pca_result$sdev^2)
+
+miRNA_pca_df <- as.data.frame(pca_result$x[, 1:pcs_count])
+colnames(miRNA_pca_df) <- paste0("PC", 1:pcs_count, " (", round(explained_variance_ratio[1:pcs_count] * 100, 2), "%)")
+
+miRNA_pca_df$Group <- paste(coldata$condition)
+
+plt <- ggpairs(
+  miRNA_pca_df, aes(color = Group, alpha = 0.7),
+  upper = list(continuous = wrap("cor", size = 5))
+)
+
+plt
+ggsave("./pictures_transpl/transpl_PCA plot 4 comp.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
 **Plot a heatmap of 50 most expressed genes**
 Этот heatmap отражает уровни экспрессии генов, а не разницу между группами.
 Цвета не означают up- или down-регуляцию в сравнении с контрольной группой, потому что heatmap показывает абсолютные значения экспрессии, а не fold change!
