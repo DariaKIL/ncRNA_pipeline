@@ -245,7 +245,7 @@ miRNA_pca_df$Group <- paste(coldata$condition)
 
 plt <- ggpairs(
   miRNA_pca_df, aes(color = Group, alpha = 0.7),
-  upper = list(continuous = wrap("cor", size = 5))
+  upper = list(continuous = wrap("cor", size = 3))
 )
 
 plt
