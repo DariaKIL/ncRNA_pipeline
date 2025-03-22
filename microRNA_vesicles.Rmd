@@ -123,7 +123,7 @@ unique_venn_list <- list(
 
 unique_venn_list
 ```
-## Весь датасет ##
+**Распределение количества ридов различных типов РНК по образцам**
 ```{r}
 anno_long <- anno %>%
   pivot_longer(cols = -Sample.name.s., names_to = "RNA_Type", values_to = "Count")
@@ -138,7 +138,7 @@ plt <- ggplot(anno_long, aes(x = Sample.name.s., y = Count, fill = RNA_Type)) +
 print(plt)
 ggsave("./pictures/barplot_alldataset_no_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300,  bg = "white")
 ```
-
+**Распределение количества ридов различных типов РНК по образцам (%)**
 ```{r}
 anno_long <- anno %>%
   rowwise() %>%
@@ -156,6 +156,7 @@ plt <- ggplot(anno_long, aes(x = Sample.name.s., y = Proportion, fill = RNA_Type
 plt
 ggsave("./pictures/barplot_alldataset_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
+## Визуализация данных: весь датасет ##
 ```{r}
 coldata$condition <- relevel(coldata$condition, ref = "before")
 modelMatrix <- model.matrix(~type*condition + patient, data = coldata)
