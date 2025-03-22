@@ -114,14 +114,12 @@ unique_a150 <- setdiff(venn_a150, c(venn_b150, venn_b16, venn_a16))
 unique_b16 <- setdiff(venn_b16, c(venn_b150, venn_a150, venn_a16))
 unique_a16 <- setdiff(venn_a16, c(venn_b150, venn_a150, venn_b16))
 
-unique_venn_list <- list(
+list(
   before_150 = unique_b150,
   after_150 = unique_a150,
   before_16 = unique_b16,
   after_16 = unique_a16
 )
-
-unique_venn_list
 ```
 **Распределение количества ридов различных типов РНК по образцам**
 ```{r}
