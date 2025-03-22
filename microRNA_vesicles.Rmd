@@ -346,10 +346,8 @@ res_150
 	2.	Определение значимых генов (синие точки):
 	•	Используется критерий padj < 0.1 по умолчанию, а не < 0.05! 
 ```{r}
-tiff("./pictures/PlotMA_standart_padj_0.05_type150.tiff", 
-     width = 8, height = 6, units = "in", res = 300, bg = "white")
-plotMA(res_150, alpha = 0.05, ylim = c(-8, 8)) 
-dev.off()
+# tiff("./pictures/PlotMA_standart_padj_0.05_type150.tiff", 
+#      width = 8, height = 6, units = "in", res = 300, bg = "white")
 plotMA(res_150, alpha = 0.05, ylim = c(-8, 8)) 
 ```
 **Кастомный MA plot по p-value**
