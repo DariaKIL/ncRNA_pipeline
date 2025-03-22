@@ -31,6 +31,7 @@ library(rvest)
 library(patchwork)
 library(dbplyr)
 library(GGally) 
+library(ggVennDiagram)
 ```
 ### Импортируем данные ###
 **Таблица фенотипов:**
@@ -75,6 +76,51 @@ summed_anno <- merged_df %>%
   group_by(condition) %>%
   summarise(across(where(is.numeric), sum))
 summed_anno
+```
+**Диаграмма Венна: микроРНК с высокой экспрессией (>150 каунтов)**
+```{r}
+counts_venn <- as.data.frame(t(counts)) %>%
+  rownames_to_column(var = "sample_count") 
+tmp <- left_join(counts_venn, coldata, by = c("sample_count" = "sample"))
+
+summed_venn <- tmp %>%
+  group_by(condition) %>%
+  summarise(across(where(is.numeric), sum)) %>%
+  pivot_longer(cols = -condition, names_to = "miRNA", values_to = "counts") %>%
+  filter(counts > 150) 
+
+venn_no_c <- summed_venn[summed_venn$condition == "no_complications", ]$miRNA 
+venn_cell <- summed_venn[summed_venn$condition == "cellular", ]$miRNA
+venn_hum <- summed_venn[summed_venn$condition == "humoral", ]$miRNA 
+venn_TCAD <- summed_venn[summed_venn$condition == "TCAD", ]$miRNA 
+
+venn_list <- list(
+  non = venn_no_c,
+  cellular = venn_cell,
+  humoral = venn_hum,
+  TCAD = venn_TCAD
+)
+
+plt <- ggVennDiagram(venn_list, label_alpha = 0) +  
+  scale_fill_gradient(low = "lightblue", high = "red") + 
+  theme_minimal()
+
+print(plt)
+ggsave("./pictures_transpl/Venn Diagram with micro-RNA expression more than 150 counts.tiff", plot = plt, width = 8, height = 6, dpi = 300,  bg = "white")
+```
+**Уникальные микроРНК для каждой группы**
+```{r}
+unique_no_c <- setdiff(venn_no_c, c(venn_cell, venn_hum, venn_TCAD))
+unique_cell <- setdiff(venn_cell, c(venn_no_c, venn_hum, venn_TCAD))
+unique_hum <- setdiff(venn_hum, c(venn_no_c, venn_cell, venn_TCAD))
+unique_TCAD <- setdiff(venn_TCAD, c(venn_no_c, venn_cell, venn_hum))
+
+list(
+  no_complications = unique_no_c,
+  cellular = unique_cell,
+  humoral = unique_hum,
+  TCAD = unique_TCAD
+)
 ```
 
 
@@ -772,7 +818,63 @@ plt <- dotplot(GO_enrich_up_TCAD_KEGG, showCategory = 20) +
 plt
 ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_UP_TCAD_KEGG.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
+```{r}
+# DEG overlap between both timepoints
+trans48 <- read.csv("./ligament_dif48h_vs_undif.csv")
+trans48_deg <- subset(trans48, trans48$padj < 0.05 & abs(trans48$log2FoldChange) > 1)
+trans48_genes <- trans48_deg$X
 
+trans10 <- read.csv("./ligament_dif10d_vs_undif.csv")
+trans10_deg <- subset(trans10, trans10$padj < 0.05 & abs(trans10$log2FoldChange) > 1)
+trans10_genes <- trans10_deg$X
+
+myCol <- brewer.pal(3, "Pastel2")
+
+# Пример с графиком Венн
+venn <- venn.diagram(
+  x = list(trans48_genes, trans10_genes),
+  category.names = c("Transcriptome (48h)", "Transcriptome (10d)"),
+  filename = NULL,  # Не сохраняем в файл, отображаем на экране
+  output = TRUE,
+  
+  # Output features
+  imagetype = "png", 
+  height = 4000, 
+  width = 4000, 
+  resolution = 500,
+  compression = "lzw",
+  
+  # Circles
+  lwd = 1,
+  lty = 'solid',
+  fill = myCol[1:2],
+  
+  # Numbers
+  cex = .7,
+  fontface = "bold",
+  fontfamily = "sans",
+  main.col = "black",
+  
+  # Set names
+  cat.cex = 0.5,
+  cat.fontface = "bold",
+  cat.default.pos = "text",
+  print.mode = c("raw", "percent"),
+  cat.pos = c(0, 180), 
+  sigdigs = 2,
+  cat.fontfamily = "sans"
+)
+
+# Отображаем диаграмму
+grid.draw(venn)
+
+Reduce(intersect, list(trans48_genes, 
+                       trans10_genes))
+```
+
+
+
+*Справка по базам данным, по которым можно провести обогащение*
 1. C1 (Genomic Signature Prediction)
 	•	Включает генетические сигнатуры, которые используются для предсказания различных фенотипов или состояний, основанных на генетической информации. 299
 2. C2 (Curated Gene Sets)

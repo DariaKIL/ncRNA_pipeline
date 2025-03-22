@@ -1,8 +1,8 @@
 ---
 title: "tRNA Vesicles"
 output:
-  pdf_document: default
   html_notebook: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -29,6 +29,7 @@ library(vsn)
 library(rvest)
 library(patchwork)
 library(dbplyr)
+library(ggVennDiagram)
 ```
 ## Импортируем данные ## 
 **Таблица фенотипов:**
@@ -57,6 +58,59 @@ common_samples <- intersect(colnames(counts), coldata$sample)
 counts <- counts[, c(counts$miRNA, common_samples)]  
 counts <- counts[, rownames(coldata)] #ранжирую по колонки в counts так же как и названия строк в coldata
 head(counts)
+```
+**Диаграмма Венна: транспортные РНК все (без каких-либо фильтров)**
+```{r}
+counts_venn <- as.data.frame(t(counts)) %>%
+  rownames_to_column(var = "sample_count") 
+
+coldata_new <- coldata %>%
+  mutate(condition_type = paste(condition, type, sep = "_")) 
+  
+coldata_new <- coldata_new[, c("sample", "condition_type")]
+
+tmp <- left_join(counts_venn, coldata_new, by = c("sample_count" = "sample"))
+
+summed_venn <- tmp %>%
+  group_by(condition_type) %>%
+  summarise(across(where(is.numeric), sum)) %>%
+  pivot_longer(cols = -condition_type, names_to = "miRNA", values_to = "counts") %>%
+  filter(counts > 0) 
+
+venn_a150 <- summed_venn[summed_venn$condition_type == "after_150", ]$miRNA
+venn_b150 <- summed_venn[summed_venn$condition_type == "before_150", ]$miRNA
+venn_a16 <- summed_venn[summed_venn$condition_type == "after_16", ]$miRNA
+venn_b16 <- summed_venn[summed_venn$condition_type == "before_16", ]$miRNA
+
+venn_list <- list(
+  before_150 = venn_b150,
+  after_150 = venn_a150,
+  before_16 = venn_b16,
+  after_16 = venn_a16
+)
+
+plt <- ggVennDiagram(venn_list, label_alpha = 0) +
+  scale_fill_gradient(low = "lightblue", high = "red") +
+  theme_minimal() 
+
+print(plt)
+ggsave("./pictures_tRNA_vesicles/tRNA_Venn Diagram_vesicles.tiff", plot = plt, width = 8, height = 6, dpi = 300,  bg = "white")
+```
+**Уникальные транспортныеРНК для каждой группы**
+```{r}
+unique_b150 <- setdiff(venn_b150, c(venn_a150, venn_b16, venn_a16))
+unique_a150 <- setdiff(venn_a150, c(venn_b150, venn_b16, venn_a16))
+unique_b16 <- setdiff(venn_b16, c(venn_b150, venn_a150, venn_a16))
+unique_a16 <- setdiff(venn_a16, c(venn_b150, venn_a150, venn_b16))
+
+unique_venn_list <- list(
+  before_150 = unique_b150,
+  after_150 = unique_a150,
+  before_16 = unique_b16,
+  after_16 = unique_a16
+)
+
+unique_venn_list
 ```
 **Матрица для анализа дифференциальной экспрессии:**
 ```{r}

@@ -54,6 +54,52 @@ counts <- counts[, c(counts$miRNA, common_samples)]
 counts <- counts[, coldata$sample] #ранжирую по колонки в counts так же как и названия строк в coldata
 head(counts)
 ```
+**Диаграмма Венна: транспортные РНК все (без каких-либо фильтров)**
+```{r}
+counts_venn <- as.data.frame(t(counts)) %>%
+  rownames_to_column(var = "sample_count") 
+tmp <- left_join(counts_venn, coldata, by = c("sample_count" = "sample"))
+
+summed_venn <- tmp %>%
+  group_by(condition) %>%
+  summarise(across(where(is.numeric), sum)) %>%
+  pivot_longer(cols = -condition, names_to = "miRNA", values_to = "counts") %>%
+  filter(counts > 0) 
+
+venn_no_c <- summed_venn[summed_venn$condition == "no_complications", ]$miRNA 
+venn_cell <- summed_venn[summed_venn$condition == "cellular", ]$miRNA
+venn_hum <- summed_venn[summed_venn$condition == "humoral", ]$miRNA 
+venn_TCAD <- summed_venn[summed_venn$condition == "TCAD", ]$miRNA 
+
+venn_list <- list(
+  non = venn_no_c,
+  cellular = venn_cell,
+  humoral = venn_hum,
+  TCAD = venn_TCAD
+)
+
+plt <- ggVennDiagram(venn_list, label_alpha = 0) +  
+  scale_fill_gradient(low = "lightblue", high = "red") + 
+  theme_minimal()
+
+print(plt)
+ggsave("./pictures_tRNA_transpl/tRNA_Venn Diagram.tiff", plot = plt, width = 8, height = 6, dpi = 300,  bg = "white")
+```
+**Уникальные транспортныеРНК для каждой группы**
+```{r}
+unique_no_c <- setdiff(venn_no_c, c(venn_cell, venn_hum, venn_TCAD))
+unique_cell <- setdiff(venn_cell, c(venn_no_c, venn_hum, venn_TCAD))
+unique_hum <- setdiff(venn_hum, c(venn_no_c, venn_cell, venn_TCAD))
+unique_TCAD <- setdiff(venn_TCAD, c(venn_no_c, venn_cell, venn_hum))
+
+list(
+  no_complications = unique_no_c,
+  cellular = unique_cell,
+  humoral = unique_hum,
+  TCAD = unique_TCAD
+)
+```
+
 **Матрица для анализа дифференциальной экспрессии:**
 ```{r}
 coldata$condition <- relevel(factor(coldata$condition), ref = "no_complications")
