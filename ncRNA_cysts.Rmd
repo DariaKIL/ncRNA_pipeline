@@ -1,0 +1,935 @@
+---
+title: "micro-RNA & tRNA Cysts"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+```{r}
+library(tidyverse)
+library(DESeq2)
+library(pheatmap)
+library(RColorBrewer)
+library(clusterProfiler)
+library(biomaRt)
+library(org.Hs.eg.db)
+library(EnhancedVolcano)
+library(GenomicRanges)
+library(msigdbr)
+library(multiMiR)
+library(miRBaseConverter)
+library(enrichplot)
+library(vsn)
+library(rvest)
+library(patchwork)
+library(dbplyr)
+library(GGally) 
+library(ggVennDiagram)
+```
+### Импортируем данные ###
+**Таблица фенотипов:**
+```{r}
+setwd("/Users/dariakilina/GitHub/Micro-RNA_cardiology")
+coldata <- read_tsv("data/phenotableC.tsv", show_col_types = FALSE)
+coldata$group <- NULL  
+coldata
+```
+**Таблица каунтов:**
+```{r}
+counts <- read.csv("data/miR.Counts.csv", header = TRUE, sep = ",")
+counts <- column_to_rownames(counts, var = "miRNA")
+head(counts)
+```
+**Таблица каунтов только для выбранных образцов:**
+```{r}
+colnames(counts) <- gsub("^X", "", colnames(counts))
+
+counts_samples <- colnames(counts)
+phenotable_samples <- coldata$sample
+common_samples <- intersect(counts_samples, phenotable_samples)
+
+counts <- counts[, c(counts$miRNA, common_samples)]  
+counts <- counts[, coldata$sample] #ранжирую по колонки в counts так же как и названия строк в coldata
+head(counts)
+```
+**Аnnotation report:**
+```{r}
+anno <- read.csv("data/annotation.report.csv", header = TRUE, sep = ",")
+anno <- anno[, -c(2:5, 7, 15)]
+ 
+common_samples <- intersect(anno$Sample.name.s., coldata$sample)
+
+anno <- anno[anno$Sample.name.s. %in% common_samples, ]
+anno <- anno[match(coldata$sample, anno$Sample.name.s.), ] #ранжирую по колонки в counts так же как и названия строк в coldata
+anno
+```
+```{r}
+merged_df <- left_join(anno, coldata, by = c("Sample.name.s." = "sample"))
+summed_anno <- merged_df %>%
+  group_by(groups) %>%
+  summarise(across(where(is.numeric), sum))
+summed_anno
+```
+**Диаграмма Венна: микроРНК с высокой экспрессией (>150 каунтов)**
+```{r}
+counts_venn <- as.data.frame(t(counts)) %>%
+  rownames_to_column(var = "sample_count") 
+tmp <- left_join(counts_venn, coldata, by = c("sample_count" = "sample"))
+
+summed_venn <- tmp %>%
+  group_by(groups) %>%
+  summarise(across(where(is.numeric), sum)) %>%
+  pivot_longer(cols = -groups, names_to = "miRNA", values_to = "counts") %>%
+  filter(counts > 300) 
+
+venn_muc <- summed_venn[summed_venn$groups == "mucinous", ]$miRNA 
+venn_ser <- summed_venn[summed_venn$groups == "serous", ]$miRNA
+
+
+venn_list <- list(
+  non = venn_muc,
+  cellular = venn_ser
+)
+
+plt <- ggVennDiagram(venn_list, label_alpha = 0) +  
+  scale_fill_gradient(low = "lightblue", high = "red") + 
+  theme_minimal()
+
+print(plt)
+ggsave("./pictures_cysts/Venn Diagram.tiff", plot = plt, width = 8, height = 6, dpi = 300,  bg = "white")
+```
+**Уникальные микроРНК для каждой группы**
+```{r}
+unique_muc <- setdiff(venn_muc, venn_ser)
+unique_ser <- setdiff(venn_ser, venn_muc)
+
+
+list(
+  mucinous = unique_muc,
+  serous = unique_ser
+)
+```
+
+
+**Весь датасет по семплам**
+```{r}
+anno_long <- anno %>%
+  pivot_longer(cols = -Sample.name.s., names_to = "RNA_Type", values_to = "Count")
+
+plt <- ggplot(anno_long, aes(x = Sample.name.s., y = Count, fill = RNA_Type)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(x = "Sample", y = "Read Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_brewer(palette = "Set3")  # Красивые цвета
+
+print(plt)
+ggsave("./pictures_cysts/barplot_alldataset_no_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300,  bg = "white")
+```
+
+```{r}
+anno_long <- anno %>%
+  rowwise() %>%
+  mutate(across(-Sample.name.s., ~ . / sum(c_across(-Sample.name.s.)))) %>% 
+  ungroup() %>%
+  pivot_longer(cols = -Sample.name.s., names_to = "RNA_Type", values_to = "Proportion")
+
+plt <- ggplot(anno_long, aes(x = Sample.name.s., y = Proportion, fill = RNA_Type)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(x = "Sample", y = "Proportion") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_brewer(palette = "Set3")
+
+plt
+ggsave("./pictures_cysts/transpl_barplot_alldataset_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**Весь датасет по группам**
+```{r}
+# summed_anno_plt <- summed_anno %>%
+#   rowwise() %>%
+#   mutate(across(-condition, ~ . / sum(c_across(-condition)))) %>% 
+#   ungroup() %>%
+#   pivot_longer(cols = -condition, names_to = "RNA_Type", values_to = "Proportion")
+
+summed_anno_plt <- summed_anno %>%
+  pivot_longer(cols = -groups, names_to = "RNA_Type", values_to = "Count")
+
+plt <- ggplot(summed_anno_plt, aes(x = groups, y = Count, fill = RNA_Type)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(x = "Sample", y = "Proportion") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_brewer(palette = "Set3")
+
+plt
+ggsave("./pictures_cysts/barplot_alldataset_normalised_by groups.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+
+
+**Матрица для анализа дифференциальной экспрессии:**
+```{r}
+modelMatrix <- model.matrix(~0 + groups, coldata)
+modelMatrix
+```
+
+**Создание DESeqDataSet:**
+```{r}
+t_dds <- DESeqDataSetFromMatrix(countData = counts, colData = coldata, design = ~0 + groups)
+t_dds
+```
+**Фильтрация датасета:**
+```{r}
+dim(t_dds)
+smallestGroupSize <- 2
+keep <- rowSums(counts(t_dds) > 0) >= smallestGroupSize
+t_dds <- t_dds[keep,]
+dim(t_dds)
+```
+###  Run Differential Expression Analysis ###
+```{r}
+t_dds <- DESeq(t_dds, fitType = "parametric")
+t_dds$groups <- relevel(t_dds$groups, ref = "serous")
+t_dds
+```
+
+```{r}
+plotDispEsts(t_dds)
+```
+**График нормализации каунтов**
+```{r}
+raw_counts <- counts(t_dds, normalized = FALSE)
+normalized_counts <- counts(t_dds, normalized = TRUE)
+
+df <- data.frame(
+  Sample = rep(colnames(t_dds), 2),
+  Counts = c(colSums(raw_counts), colSums(normalized_counts)),
+  Type = rep(c("Raw", "Normalized"), each = ncol(t_dds))
+)
+
+plt <- ggplot(df, aes(x = Sample, y = Counts, fill = Type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(title = "Counts before and after normalization", x = "Sample", y = "Total Counts") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+plt
+ggsave("./pictures_cysts/Counts before and after normalization.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**rlog трансформация**
+
+- Позволяет стабилизировать дисперсию (разброс значений), особенно для генов с низким уровнем экспрессии.  
+- Преобразует данные в логарифмическую шкалу, но с регуляризацией, чтобы избежать сильного влияния малых значений. 
+
+	•	Ось X: среднее количество прочтений (reads).  
+	•	Ось Y: стандартное отклонение (разброс значений экспрессии).  
+
+	•	График должен показывать почти горизонтальную линию, то есть SD не зависит от среднего выражения.  
+	•	Это значит, что трансформация успешно стабилизировала дисперсию, что делает данные более пригодными для дальнейшего анализа.  
+```{r}
+rlt <- rlog(t_dds)  #rlog Transformation
+meanSdPlot(assay(rlt)) 
+
+```
+**rlog трансформация**
+```{r}
+vsd <- varianceStabilizingTransformation(t_dds, blind=FALSE) 
+meanSdPlot(assay(vsd)) #показывает, как изменяется стандартное отклонение в зависимости от среднего значения экспрессии
+```
+
+**PCA plot**
+```{r}
+pcaData <- plotPCA(rlt, intgroup=c("groups"), returnData = TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+
+pcaData$sample <- gsub("_.*", "", coldata$sample)
+
+
+plt <- ggplot(pcaData, aes(PC1, PC2, color = groups)) +
+  geom_text(aes(label=sample), size=3, vjust=1.5) +
+  geom_point(size = 3) +
+  xlab(paste0("PC1: ", percentVar[1], "%")) +
+  ylab(paste0("PC2: ", percentVar[2], "%")) + 
+  coord_fixed() +
+  theme_bw() +
+  scale_color_brewer(palette = "Set2")
+plt
+ggsave("./pictures_cysts/PCA plot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**PCA c большим количеством компонент**
+Если боксплот для PC1 показывает, что одна группа имеет более широкий разброс значений, это значит, что эта группа более вариабельна по данной компоненте. Если боксплот очень узкий, значит, почти все образцы имеют схожие значения в этой компоненте.
+corr: коэффициент корреляции Пирсона между двумя главными компонентами 
+```{r}
+pcs_count <- 4  
+pca_result <- prcomp(t(assay(rlt)), center = TRUE, scale. = TRUE)
+
+# Достаем объяснённую дисперсию
+explained_variance_ratio <- pca_result$sdev^2 / sum(pca_result$sdev^2)
+
+miRNA_pca_df <- as.data.frame(pca_result$x[, 1:pcs_count])
+colnames(miRNA_pca_df) <- paste0("PC", 1:pcs_count, " (", round(explained_variance_ratio[1:pcs_count] * 100, 2), "%)")
+
+miRNA_pca_df$Group <- paste(coldata$groups)
+
+plt <- ggpairs(
+  miRNA_pca_df, aes(color = Group, alpha = 0.7),
+  upper = list(groups = wrap("cor", size = 3))
+)
+
+plt
+ggsave("./pictures_cysts/PCA plot 4 comp.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**Plot a heatmap of 50 most expressed genes**
+Этот heatmap отражает уровни экспрессии генов, а не разницу между группами.
+Цвета не означают up- или down-регуляцию в сравнении с контрольной группой, потому что heatmap показывает абсолютные значения экспрессии, а не fold change!
+```{r}
+select <- order(rowMeans(counts(t_dds,normalized=TRUE)),
+                decreasing=TRUE)[1:50]
+df <- as.data.frame(colData(t_dds)$groups)
+colnames(df) <- "groups"
+rownames(df) <- colnames(counts(t_dds))
+plt <- pheatmap(assay(rlt)[select,], 
+         cluster_rows = TRUE, 
+         show_rownames = TRUE, 
+         cluster_cols = TRUE, 
+         annotation_col = df,
+         fontsize_row = 6) 
+
+plt
+ggsave("./pictures_cysts/Plot a heatmap of 50 most expressed genes.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**Plot of the distance between samples heatmap**
+Расчет расстояний между образцами
+	•	Обычно используется евклидово расстояние (по умолчанию в DESeq2).
+	•	Оно вычисляется по нормализованным данным экспрессии (rlog() или vst()).
+	•	Чем меньше расстояние — тем более похожи образцы.
+```{r}
+sampleDists <- dist(t(assay(rlt)))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- paste(rlt$sample, rlt$groups, sep="_")
+colnames(sampleDistMatrix) <- paste(rlt$sample, rlt$groups, sep="_")
+colors <- colorRampPalette(rev(brewer.pal(9, "Blues")) )(255)
+
+plt <- pheatmap(sampleDistMatrix,
+         clustering_distance_rows = "euclidean",
+         clustering_distance_cols = "euclidean",
+         color = colors)
+
+plt
+ggsave("./pictures_cysts/Plot of the distance between samples heatmap.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**Результаты анализа диф экспресии муцинозные кисты VS серозные(реф)**
+```{r}
+res <- results(t_dds, contrast=c("groups", "mucinous", "serous"))
+res
+```
+**MA plot**
+Фильтрация точек с низким средним экспрессированием (по baseMean).
+	•	Обычно отсекаются baseMean < 1.
+	2.	Определение значимых генов (синие точки):
+	•	Используется критерий padj < 0.1 по умолчанию, а не < 0.05! 
+```{r}
+tiff("./pictures_cysts/PlotMA_standart_padj_0.05.tiff", 
+     width = 8, height = 6, units = "in", res = 300, bg = "white")
+plotMA(res, alpha = 0.05, ylim = c(-8, 8)) 
+dev.off()
+plotMA(res, alpha = 0.05, ylim = c(-8, 8)) 
+```
+**Кастомный MA plot**
+```{r}
+res_df <- res %>%
+  as.data.frame() %>%
+  mutate(color = case_when( 
+    padj < 0.05  ~ "padj < 0.05",   
+    pvalue < 0.05  ~ "pvalue < 0.05", 
+    TRUE ~ "All"
+  ))
+
+plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
+  geom_point(alpha = 0.7, size = 1) +
+  geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +
+  scale_color_manual(values = c("All" = "gray70", 
+                                "pvalue < 0.05" = "blue", 
+                                "padj < 0.05" = "red")) +
+  scale_x_log10(labels = scales::scientific) + 
+  theme_minimal() +
+  labs(x = "mean of normalized counts", 
+       y = "log fold change", 
+       color = NULL)
+
+plt
+ggsave("./pictures_cysts/Сustom MAplot_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+
+**Значимые результаты**
+
+```{r}
+signres <- results(t_dds, contrast=c("groups", "mucinous", "serous"), alpha=0.05) 
+summary(signres)
+```
+Let's arranged it by log2FoldChange:
+```{r}
+order_indices <- order(-res$log2FoldChange)
+res[order_indices, ]
+```
+**Visualisation for the first gene**
+```{r}
+#plotCounts(t_dds, gene=which.max(res_humoral$log2FoldChange), intgroup="condition")
+plotCounts(t_dds, gene=which.min(res$padj), intgroup="groups")
+#plotCounts(t_dds, gene=rownames(res)[which.min(res$padj[which.max(res$log2FoldChange)])], intgroup="condition")
+```
+**Визуализация в виде боксплотов**
+
+```{r}
+# gene_idx <- which.min(res_humoral$padj)
+# gene_name <- rownames(res_humoral)[gene_idx]  
+
+selected_miRNA <- "hsa-miR-215-3p"
+
+gene_idx <- which(rownames(res) == selected_miRNA)
+gene_name <- rownames(res)[gene_idx] 
+  
+count_data <- plotCounts(t_dds, gene=gene_idx, intgroup="groups", returnData=TRUE)
+count_data$sample <- gsub("_.*", "", rownames(count_data))  
+
+plt <- ggplot(count_data, aes(x=groups, y=count, fill=groups)) +
+  geom_boxplot(alpha=0.5) +
+  geom_text(aes(label=sample), size=3, vjust=-1) + 
+  geom_jitter(width=0.2, size=2, alpha=0.7) +
+  scale_y_log10() +
+  ggtitle(paste("Expression of", gene_name)) +
+  theme_minimal()
+
+plt
+ggsave("./pictures_cysts/boxplots_hsa-miR-215-3p.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+**Volcano plot**
+```{r}
+plt <- EnhancedVolcano(res,
+                lab = rownames(res),
+                x = "log2FoldChange",
+                y = "padj",
+                pCutoff = 0.05,
+                FCcutoff = 1,
+                labSize = 3.0,
+                boxedLabels = FALSE,
+                col = c('black', '#CBD5E8', '#B3E2CD', '#FDCDAC'),
+                colAlpha = 1,
+                title = NULL,        
+                subtitle = NULL) 
+
+plt
+ggsave("./pictures_cysts/VolcanoPlot_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**Plot a heatmap of diff expressed genes**
+```{r}
+res_sign <- subset(res, padj < 0.05 & !is.na(padj) & abs(log2FoldChange) > 1.0)
+res_sign <- res_sign[order(res_sign$log2FoldChange, decreasing = TRUE), ]
+
+sig_genes <- rownames(res_sign)  
+
+de_mat <- assay(rlt)[sig_genes, ] 
+
+de_mat_filtered <- de_mat[, coldata$sample]
+#datamatrix <- t(scale(t(de_mat_filtered)))
+datamatrix <- de_mat_filtered
+
+annotation_col <- data.frame(group = coldata$groups)
+rownames(annotation_col) <- colnames(datamatrix)
+
+annotation_colors <- list(
+  condition = c("mucinous" = "#FFCC00", "serous" = "#3399FF"))
+
+plt <- pheatmap(datamatrix,
+         cluster_rows = TRUE, 
+         show_rownames = TRUE, 
+         cluster_cols = TRUE, 
+         annotation_col = annotation_col,
+         annotation_colors = annotation_colors,
+         display_numbers = FALSE,
+         legend = TRUE,
+         fontsize = 15)  
+
+ggsave("./pictures_cysts/Heatmap of diff expressed genes.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+
+### Анализ обогащения гуморальное отторжение###
+```{r}
+up <- res_sign %>% 
+  as.data.frame() %>% 
+  filter(log2FoldChange > 0)
+down <- res_sign %>% 
+  as.data.frame() %>% 
+  filter(log2FoldChange < 0)
+rownames(up)
+rownames(down)
+```
+	•	miR-200a / 200b / 200b-5p / 200a-5p / 429 / 141-3p семейство miR-200, ниже в серозных опухолях, особенно high-grade. https://www.mdpi.com/1422-0067/16/8/16833
+	•	miR-192 / miR-194 / miR-215 входят в “intestinal lineage” паттерн 
+	•	miR-1246 — онкомиР, повышен в разных карциномах. Может быть ассоциирован с секрецией через экзосомы.
+	•	miR-203a-3p — также ассоциирован с дифференцировкой и может быть выше в опухолях с эпителиальной характеристикой.
+
+https://bora.uib.no/bora-xmlui/bitstream/handle/11250/3025120/genes-13-00191.pdf?sequence=1
+**Конвертация в MIMATID** 
+```{r}
+converted_up <- miRNAVersionConvert(rownames(up))
+converted_up
+converted_down <- miRNAVersionConvert(rownames(down))
+converted_down
+```
+**Запрос таргетов из базы multiMiR** 
+```{r}
+targets_down <- unique(get_multimir(org = "hsa", mirna = converted_up$Accession, table = "validated")@data$target_symbol)
+targets_up <- unique(get_multimir(org = "hsa", mirna = converted_down$Accession, table = "validated")@data$target_symbol)
+#writeLines(targets_down, "targets_down150_list.txt")
+```
+**Анализ обогащения из базы биологических процессов**
+```{r}
+#msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "GO:BP")
+# targets_down <- readLines("targets_down150_list.txt")
+# targets_up <- readLines("targets_up150_list.txt")
+
+GO_enrich_up_bp <- enrichGO(
+  gene          = targets_up,  
+  OrgDb         = org.Hs.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "BP", 
+  pAdjustMethod = "BH",
+  qvalueCutoff  = 0.05
+)
+
+GO_enrich_down_bp <- enrichGO(
+  gene          = targets_down,  
+  OrgDb         = org.Hs.eg.db,
+  keyType       = "SYMBOL",
+  ont           = "BP", 
+  pAdjustMethod = "BH",
+  qvalueCutoff  = 0.05
+)
+```
+
+**Визуализация**
+```{r}
+
+p1 <- dotplot(GO_enrich_up_bp, showCategory = 20) + 
+  ggtitle("GO Enrichment for UPregulated targets mucinous vs serous (as a ref)") + 
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.y = element_text(size = 20)
+  )
+
+p2 <- dotplot(GO_enrich_down_bp, showCategory = 20) + 
+  ggtitle("GO Enrichment for DOWNregulated targets mucinous vs serous (as a ref)") + 
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.y = element_text(size = 20)
+  )
+
+p1 + p2
+
+comb_plot <- p1 + p2
+
+ggsave("./pictures_cysts/GO_enrichment_dotplot_bp.tiff", plot = comb_plot, width = 16, height = 10, dpi = 300)
+```
+```{r}
+GO_enrich_UP_BP <- enrichplot::pairwise_termsim(GO_enrich_up_bp, method = "JC")
+
+plt <- emapplot(GO_enrich_UP_BP, 
+         repel = TRUE,
+         showCategory = 20) +
+  ggtitle("Biological processes for UPregulated targets mucinous vs serous (as a ref)") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 3)
+    )    
+
+plt
+
+ggsave("./pictures_cysts/GO_enrichment_emapplot_up_BP.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+```{r}
+GO_enrich_UP_BP@result$Description[1:20]
+```
+```{r}
+GO_enrich_DOWN_BP <- enrichplot::pairwise_termsim(GO_enrich_down_bp, method = "JC")
+
+plt <- emapplot(GO_enrich_DOWN_BP, 
+         repel = TRUE,
+         showCategory = 20) +
+  ggtitle("Biological processes for DOWNregulated targets for mucinous vs serous (as a ref)") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 3)
+    )    
+
+plt
+
+ggsave("./pictures_cysts/GO_enrichment_emapplot_down_BP.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+
+```{r}
+GO_enrich_DOWN_BP@result$Description[1:20]
+```
+что муцинозные опухоли менее пролиферативны или имеют сниженный уровень транскрипционно-транспортной активности, чем серозные
+и мы видим снижение пролиферации, обменных процессов - то есть сниженная метаб активность
+
+**Визуализация путей Hallmark Gene Sets**
+
+```{r}
+msig_go_bp <- msigdbr(species = "Homo sapiens", category = "H")
+
+GO_enrich_up_H <- enricher(gene = targets_up, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
+GO_enrich_down_H <- enricher(gene = targets_down, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
+
+p2 <- dotplot(GO_enrich_down_H, showCategory = 20) + 
+  ggtitle("GO Enrichment for DOWNregulated targets  Hallmark Gene Sets mucinous vs serous (as a ref) ") + 
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.y = element_text(size = 20)
+  )
+
+p2
+
+ggsave("./pictures_cysts/GO_enrichment_dotplot_ Hallmark Gene Sets.tiff", plot = p2, width = 16, height = 10, dpi = 300)
+```
+```{r}
+GO_enrich_down_H@result$Description[1:20]
+```
+
+
+Для одного даунрегулированного miR не обнаружено таких путей
+
+## tRNA 
+
+### Импортируем данные ###
+**Таблица каунтов:**
+```{r}
+t_counts <- read.csv("data/tRF.counts.csv", header = TRUE, sep = ",")
+t_counts <- column_to_rownames(t_counts, var = "entry.name")
+head(t_counts)
+```
+**Таблица каунтов только для выбранных образцов:**
+```{r}
+colnames(t_counts) <- gsub("^X", "", colnames(t_counts))
+
+t_counts_samples <- colnames(t_counts)
+phenotable_samples <- coldata$sample
+common_samples <- intersect(t_counts_samples, phenotable_samples)
+
+t_counts <- t_counts[, coldata$sample] #ранжирую по колонки в t_counts так же как и названия строк в coldata
+head(t_counts)
+```
+**Диаграмма Венна: tРНК с высокой экспрессией (>150 каунтов)**
+```{r}
+t_counts_venn <- as.data.frame(t(t_counts)) %>%
+  rownames_to_column(var = "sample_count") 
+tmp <- left_join(t_counts_venn, coldata, by = c("sample_count" = "sample"))
+
+t_summed_venn <- tmp %>%
+  group_by(groups) %>%
+  summarise(across(where(is.numeric), sum)) %>%
+  pivot_longer(cols = -groups, names_to = "tRNA" , values_to = "t_counts") %>% #здесь я сама ввожу "tRNA" и "t_counts", чтобы пронятно было как назваать эти строки в pivot_longer!!!
+  filter(t_counts > 150)
+
+t_venn_muc <- t_summed_venn[t_summed_venn$groups == "mucinous", ]$tRNA
+t_venn_ser <- t_summed_venn[t_summed_venn$groups == "serous", ]$tRNA
+
+
+t_venn_list <- list(
+  mucinous = t_venn_muc,
+  serous = t_venn_ser
+)
+
+plt <- ggVennDiagram(t_venn_list, label_alpha = 0) +
+  scale_fill_gradient(low = "lightblue", high = "red") +
+  theme_minimal()
+ 
+print(plt)
+ggsave("./pictures_cysts/trna_Venn Diagram.tiff", plot = plt, width = 8, height = 6, dpi = 300,  bg = "white")
+```
+**Уникальные микроРНК для каждой группы**
+```{r}
+unique_muc <- setdiff(t_venn_muc, t_venn_ser)
+unique_ser <- setdiff(t_venn_ser, t_venn_muc)
+
+
+list(
+  mucinous = unique_muc,
+  serous = unique_ser
+)
+```
+**Матрица для анализа дифференциальной экспрессии:**
+```{r}
+modelMatrix <- model.matrix(~0 + groups, coldata)
+modelMatrix
+```
+
+**Создание DESeqDataSet:**
+```{r}
+t_dds <- DESeqDataSetFromMatrix(countData = t_counts, colData = coldata, design = ~0 + groups)
+t_dds
+```
+**Фильтрация датасета:**
+```{r}
+dim(t_dds)
+smallestGroupSize <- 2
+keep <- rowSums(counts(t_dds) > 0) >= smallestGroupSize
+t_dds <- t_dds[keep,]
+dim(t_dds)
+```
+###  Run Differential Expression Analysis ###
+```{r}
+t_dds <- DESeq(t_dds, fitType = "parametric")
+t_dds$groups <- relevel(t_dds$groups, ref = "serous")
+t_dds
+```
+
+```{r}
+plotDispEsts(t_dds)
+```
+**График нормализации каунтов**
+```{r}
+raw_t_counts <- counts(t_dds, normalized = FALSE)
+normalized_t_counts <- counts(t_dds, normalized = TRUE)
+
+df <- data.frame(
+  Sample = rep(colnames(t_dds), 2),
+  t_counts = c(colSums(raw_t_counts), colSums(normalized_t_counts)),
+  Type = rep(c("Raw", "Normalized"), each = ncol(t_dds))
+)
+
+plt <- ggplot(df, aes(x = Sample, y = t_counts, fill = Type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(title = "t_counts before and after normalization", x = "Sample", y = "Total t_counts") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+plt
+ggsave("./pictures_cysts/t_counts before and after normalization.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**rlog трансформация**
+
+- Позволяет стабилизировать дисперсию (разброс значений), особенно для генов с низким уровнем экспрессии.  
+- Преобразует данные в логарифмическую шкалу, но с регуляризацией, чтобы избежать сильного влияния малых значений. 
+
+	•	Ось X: среднее количество прочтений (reads).  
+	•	Ось Y: стандартное отклонение (разброс значений экспрессии).  
+
+	•	График должен показывать почти горизонтальную линию, то есть SD не зависит от среднего выражения.  
+	•	Это значит, что трансформация успешно стабилизировала дисперсию, что делает данные более пригодными для дальнейшего анализа.  
+```{r}
+rlt <- rlog(t_dds)  #rlog Transformation
+meanSdPlot(assay(rlt)) 
+
+```
+**rlog трансформация**
+```{r}
+vsd <- varianceStabilizingTransformation(t_dds, blind=FALSE) 
+meanSdPlot(assay(vsd)) #показывает, как изменяется стандартное отклонение в зависимости от среднего значения экспрессии
+```
+
+**PCA plot**
+```{r}
+pcaData <- plotPCA(rlt, intgroup=c("groups"), returnData = TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+
+pcaData$sample <- gsub("_.*", "", coldata$sample)
+
+
+plt <- ggplot(pcaData, aes(PC1, PC2, color = groups)) +
+  geom_text(aes(label=sample), size=3, vjust=1.5) +
+  geom_point(size = 3) +
+  xlab(paste0("PC1: ", percentVar[1], "%")) +
+  ylab(paste0("PC2: ", percentVar[2], "%")) + 
+  coord_fixed() +
+  theme_bw() +
+  scale_color_brewer(palette = "Set2")
+plt
+ggsave("./pictures_cysts/trna_PCA plot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**Plot a heatmap of 50 most expressed genes**
+Синий — меньше среднего по строке 
+Жёлтый/красный — выше среднего по строке 
+Даже если гены очень высокоэкспрессированные в целом, если в каких-то образцах они выражены меньше, чем в других — будет синий.
+```{r}
+select <- order(rowMeans(counts(t_dds,normalized=TRUE)),
+                decreasing=TRUE)[1:50]
+df <- as.data.frame(colData(t_dds)$groups)
+colnames(df) <- "groups"
+rownames(df) <- colnames(counts(t_dds))
+plt <- pheatmap(assay(rlt)[select,], 
+                scale = "none", 
+                cluster_rows = TRUE, 
+                show_rownames = TRUE, 
+                cluster_cols = TRUE, 
+                annotation_col = df,
+                fontsize_row = 6) 
+
+plt
+ggsave("./pictures_cysts/trna_Plot a heatmap of 50 most expressed genes.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**Plot of the distance between samples heatmap**
+Расчет расстояний между образцами
+	•	Обычно используется евклидово расстояние (по умолчанию в DESeq2).
+	•	Оно вычисляется по нормализованным данным экспрессии (rlog() или vst()).
+	•	Чем меньше расстояние — тем более похожи образцы.
+```{r}
+sampleDists <- dist(t(assay(rlt)))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- paste(rlt$sample, rlt$groups, sep="_")
+colnames(sampleDistMatrix) <- paste(rlt$sample, rlt$groups, sep="_")
+colors <- colorRampPalette(rev(brewer.pal(9, "Blues")) )(255)
+
+plt <- pheatmap(sampleDistMatrix,
+         clustering_distance_rows = "euclidean",
+         clustering_distance_cols = "euclidean",
+         color = colors)
+
+plt
+ggsave("./pictures_cysts/tRNA_Plot of the distance between samples heatmap.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**Результаты анализа диф экспресии муцинозные кисты VS серозные(реф)**
+```{r}
+res <- results(t_dds, contrast=c("groups", "mucinous", "serous"))
+res
+```
+**MA plot**
+Фильтрация точек с низким средним экспрессированием (по baseMean).
+	•	Обычно отсекаются baseMean < 1.
+	2.	Определение значимых генов (синие точки):
+	•	Используется критерий padj < 0.1 по умолчанию, а не < 0.05! 
+```{r}
+tiff("./pictures_cysts/trna_PlotMA_standart_padj_0.05.tiff", 
+     width = 8, height = 6, units = "in", res = 300, bg = "white")
+plotMA(res, alpha = 0.05, ylim = c(-8, 8)) 
+dev.off()
+plotMA(res, alpha = 0.05, ylim = c(-8, 8)) 
+```
+**Кастомный MA plot**
+```{r}
+res_df <- res %>%
+  as.data.frame() %>%
+  mutate(color = case_when( 
+    padj < 0.05  ~ "padj < 0.05",   
+    pvalue < 0.05  ~ "pvalue < 0.05", 
+    TRUE ~ "All"
+  ))
+
+plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
+  geom_point(alpha = 0.7, size = 1) +
+  geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +
+  scale_color_manual(values = c("All" = "gray70", 
+                                "pvalue < 0.05" = "blue", 
+                                "padj < 0.05" = "red")) +
+  scale_x_log10(labels = scales::scientific) + 
+  theme_minimal() +
+  labs(x = "mean of normalized t_counts", 
+       y = "log fold change", 
+       color = NULL)
+
+plt
+ggsave("./pictures_cysts/trna_Сustom MAplot_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+
+**Значимые результаты**
+
+```{r}
+signres <- results(t_dds, contrast=c("groups", "mucinous", "serous"), alpha=0.05) 
+summary(signres)
+```
+Let's arranged it by log2FoldChange:
+```{r}
+order_indices <- order(-res$log2FoldChange)
+res[order_indices, ]
+```
+**Visualisation for the first gene**
+```{r}
+#plotCounts(t_dds, gene=which.max(res_humoral$log2FoldChange), intgroup="condition")
+plotCounts(t_dds, gene=which.min(res$padj), intgroup="groups")
+#plotCounts(t_dds, gene=rownames(res)[which.min(res$padj[which.max(res$log2FoldChange)])], intgroup="condition")
+```
+**Визуализация в виде боксплотов**
+
+```{r}
+# gene_idx <- which.min(res_humoral$padj)
+# gene_name <- rownames(res_humoral)[gene_idx]  
+
+selected_miRNA <- "Tyr_Comb_1"
+
+gene_idx <- which(rownames(res) == selected_miRNA)
+gene_name <- rownames(res)[gene_idx] 
+  
+count_data <- plotCounts(t_dds, gene=gene_idx, intgroup="groups", returnData=TRUE)
+count_data$sample <- gsub("_.*", "", rownames(count_data))  
+
+plt <- ggplot(count_data, aes(x=groups, y=count, fill=groups)) +
+  geom_boxplot(alpha=0.5) +
+  geom_text(aes(label=sample), size=3, vjust=-1) + 
+  geom_jitter(width=0.2, size=2, alpha=0.7) +
+  scale_y_log10() +
+  ggtitle(paste("Expression of", gene_name)) +
+  theme_minimal()
+
+plt
+ggsave("./pictures_cysts/trna_boxplots_hsa-miR-215-3p.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+**Volcano plot**
+```{r}
+plt <- EnhancedVolcano(res,
+                lab = rownames(res),
+                x = "log2FoldChange",
+                y = "pvalue",
+                pCutoff = 0.05,
+                FCcutoff = 1,
+                labSize = 3.0,
+                boxedLabels = FALSE,
+                col = c('black', '#CBD5E8', '#B3E2CD', '#FDCDAC'),
+                colAlpha = 1,
+                title = NULL,        
+                subtitle = NULL) 
+
+plt
+ggsave("./pictures_cysts/trna_VolcanoPlot_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+**Plot a heatmap of diff expressed genes**
+```{r}
+res_sign <- subset(res, pvalue < 0.05 & !is.na(pvalue) & abs(log2FoldChange) > 1.0)
+res_sign <- res_sign[order(res_sign$log2FoldChange, decreasing = TRUE), ]
+
+sig_genes <- rownames(res_sign)  
+
+de_mat <- assay(rlt)[sig_genes, ] 
+
+de_mat_filtered <- de_mat[, coldata$sample]
+#datamatrix <- t(scale(t(de_mat_filtered)))
+datamatrix <- de_mat_filtered
+
+annotation_col <- data.frame(group = coldata$groups)
+rownames(annotation_col) <- colnames(datamatrix)
+
+annotation_colors <- list(
+  condition = c("mucinous" = "#FFCC00", "serous" = "#3399FF"))
+
+plt <- pheatmap(datamatrix,
+         cluster_rows = TRUE, 
+         show_rownames = TRUE, 
+         cluster_cols = TRUE, 
+         annotation_col = annotation_col,
+         annotation_colors = annotation_colors,
+         display_numbers = FALSE,
+         legend = TRUE,
+         fontsize = 15)  
+
+ggsave("./pictures_cysts/trna_Heatmap of diff expressed genes.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+
+
