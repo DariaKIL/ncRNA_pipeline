@@ -105,7 +105,7 @@ plt <- ggVennDiagram(venn_list, label_alpha = 0) +
   theme_minimal()
 
 print(plt)
-ggsave("./pictures_cysts/Venn Diagram.tiff", plot = plt, width = 8, height = 6, dpi = 300,  bg = "white")
+ggsave("./pictures_cysts/micro_RNA_micro_RNA_Venn Diagram.tiff", plot = plt, width = 8, height = 6, dpi = 300,  bg = "white")
 ```
 **Уникальные микроРНК для каждой группы**
 ```{r}
@@ -133,7 +133,7 @@ plt <- ggplot(anno_long, aes(x = Sample.name.s., y = Count, fill = RNA_Type)) +
   scale_fill_brewer(palette = "Set3")  # Красивые цвета
 
 print(plt)
-ggsave("./pictures_cysts/barplot_alldataset_no_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300,  bg = "white")
+ggsave("./pictures_cysts/micro_RNA_barplot_alldataset_no_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300,  bg = "white")
 ```
 
 ```{r}
@@ -151,7 +151,7 @@ plt <- ggplot(anno_long, aes(x = Sample.name.s., y = Proportion, fill = RNA_Type
   scale_fill_brewer(palette = "Set3")
 
 plt
-ggsave("./pictures_cysts/transpl_barplot_alldataset_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_cysts/micro_RNA_transpl_barplot_alldataset_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **Весь датасет по группам**
 ```{r}
@@ -172,7 +172,7 @@ plt <- ggplot(summed_anno_plt, aes(x = groups, y = Count, fill = RNA_Type)) +
   scale_fill_brewer(palette = "Set3")
 
 plt
-ggsave("./pictures_cysts/barplot_alldataset_normalised_by groups.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_cysts/micro_RNA_barplot_alldataset_normalised_by groups.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 
 
@@ -223,7 +223,7 @@ plt <- ggplot(df, aes(x = Sample, y = Counts, fill = Type)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 plt
-ggsave("./pictures_cysts/Counts before and after normalization.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_cysts/micro_RNA_Counts before and after normalization.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **rlog трансформация**
 
@@ -263,7 +263,7 @@ plt <- ggplot(pcaData, aes(PC1, PC2, color = groups)) +
   theme_bw() +
   scale_color_brewer(palette = "Set2")
 plt
-ggsave("./pictures_cysts/PCA plot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_cysts/micro_RNA_PCA plot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **PCA c большим количеством компонент**
 Если боксплот для PC1 показывает, что одна группа имеет более широкий разброс значений, это значит, что эта группа более вариабельна по данной компоненте. Если боксплот очень узкий, значит, почти все образцы имеют схожие значения в этой компоненте.
@@ -286,7 +286,7 @@ plt <- ggpairs(
 )
 
 plt
-ggsave("./pictures_cysts/PCA plot 4 comp.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_cysts/micro_RNA_PCA plot 4 comp.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **Plot a heatmap of 50 most expressed genes**
 Этот heatmap отражает уровни экспрессии генов, а не разницу между группами.
@@ -305,7 +305,7 @@ plt <- pheatmap(assay(rlt)[select,],
          fontsize_row = 6) 
 
 plt
-ggsave("./pictures_cysts/Plot a heatmap of 50 most expressed genes.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_cysts/micro_RNA_Plot a heatmap of 50 most expressed genes.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **Plot of the distance between samples heatmap**
 Расчет расстояний между образцами
@@ -325,7 +325,7 @@ plt <- pheatmap(sampleDistMatrix,
          color = colors)
 
 plt
-ggsave("./pictures_cysts/Plot of the distance between samples heatmap.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_cysts/micro_RNA_Plot of the distance between samples heatmap.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **Результаты анализа диф экспресии муцинозные кисты VS серозные(реф)**
 ```{r}
@@ -338,7 +338,7 @@ res
 	2.	Определение значимых генов (синие точки):
 	•	Используется критерий padj < 0.1 по умолчанию, а не < 0.05! 
 ```{r}
-tiff("./pictures_cysts/PlotMA_standart_padj_0.05.tiff", 
+tiff("./pictures_cysts/micro_RNA_PlotMA_standart_padj_0.05.tiff", 
      width = 8, height = 6, units = "in", res = 300, bg = "white")
 plotMA(res, alpha = 0.05, ylim = c(-8, 8)) 
 dev.off()
@@ -367,7 +367,7 @@ plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
        color = NULL)
 
 plt
-ggsave("./pictures_cysts/Сustom MAplot_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_cysts/micro_RNA_Сustom MAplot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 
 **Значимые результаты**
@@ -383,15 +383,15 @@ res[order_indices, ]
 ```
 **Visualisation for the first gene**
 ```{r}
-#plotCounts(t_dds, gene=which.max(res_humoral$log2FoldChange), intgroup="condition")
+#plotCounts(t_dds, gene=which.max(res$log2FoldChange), intgroup="condition")
 plotCounts(t_dds, gene=which.min(res$padj), intgroup="groups")
 #plotCounts(t_dds, gene=rownames(res)[which.min(res$padj[which.max(res$log2FoldChange)])], intgroup="condition")
 ```
 **Визуализация в виде боксплотов**
 
 ```{r}
-# gene_idx <- which.min(res_humoral$padj)
-# gene_name <- rownames(res_humoral)[gene_idx]  
+# gene_idx <- which.min(res$padj)
+# gene_name <- rownames(res)[gene_idx]  
 
 selected_miRNA <- "hsa-miR-215-3p"
 
@@ -410,7 +410,7 @@ plt <- ggplot(count_data, aes(x=groups, y=count, fill=groups)) +
   theme_minimal()
 
 plt
-ggsave("./pictures_cysts/boxplots_hsa-miR-215-3p.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+ggsave("./pictures_cysts/micro_RNA_boxplots_hsa-miR-215-3p.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
 **Volcano plot**
 ```{r}
@@ -428,7 +428,7 @@ plt <- EnhancedVolcano(res,
                 subtitle = NULL) 
 
 plt
-ggsave("./pictures_cysts/VolcanoPlot_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_cysts/micro_RNA_VolcanoPlot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **Plot a heatmap of diff expressed genes**
 ```{r}
@@ -459,7 +459,7 @@ plt <- pheatmap(datamatrix,
          legend = TRUE,
          fontsize = 15)  
 
-ggsave("./pictures_cysts/Heatmap of diff expressed genes.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_cysts/micro_RNA_Heatmap of diff expressed genes.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 
 ### Анализ обогащения гуморальное отторжение###
@@ -538,7 +538,7 @@ p1 + p2
 
 comb_plot <- p1 + p2
 
-ggsave("./pictures_cysts/GO_enrichment_dotplot_bp.tiff", plot = comb_plot, width = 16, height = 10, dpi = 300)
+ggsave("./pictures_cysts/micro_RNA_GO_enrichment_dotplot_bp.tiff", plot = comb_plot, width = 16, height = 10, dpi = 300)
 ```
 ```{r}
 GO_enrich_UP_BP <- enrichplot::pairwise_termsim(GO_enrich_up_bp, method = "JC")
@@ -554,7 +554,7 @@ plt <- emapplot(GO_enrich_UP_BP,
 
 plt
 
-ggsave("./pictures_cysts/GO_enrichment_emapplot_up_BP.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+ggsave("./pictures_cysts/micro_RNA_GO_enrichment_emapplot_up_BP.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
 ```{r}
 GO_enrich_UP_BP@result$Description[1:20]
@@ -573,7 +573,7 @@ plt <- emapplot(GO_enrich_DOWN_BP,
 
 plt
 
-ggsave("./pictures_cysts/GO_enrichment_emapplot_down_BP.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+ggsave("./pictures_cysts/micro_RNA_GO_enrichment_emapplot_down_BP.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
 
 ```{r}
@@ -599,7 +599,7 @@ p2 <- dotplot(GO_enrich_down_H, showCategory = 20) +
 
 p2
 
-ggsave("./pictures_cysts/GO_enrichment_dotplot_ Hallmark Gene Sets.tiff", plot = p2, width = 16, height = 10, dpi = 300)
+ggsave("./pictures_cysts/micro_RNA_GO_enrichment_dotplot_ Hallmark Gene Sets.tiff", plot = p2, width = 16, height = 10, dpi = 300)
 ```
 ```{r}
 GO_enrich_down_H@result$Description[1:20]
@@ -714,7 +714,7 @@ plt <- ggplot(df, aes(x = Sample, y = t_counts, fill = Type)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 plt
-ggsave("./pictures_cysts/t_counts before and after normalization.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_cysts/trna_before and after normalization.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **rlog трансформация**
 
@@ -837,7 +837,7 @@ plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
        color = NULL)
 
 plt
-ggsave("./pictures_cysts/trna_Сustom MAplot_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_cysts/trna_Сustom MAplot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 
 **Значимые результаты**
@@ -853,15 +853,15 @@ res[order_indices, ]
 ```
 **Visualisation for the first gene**
 ```{r}
-#plotCounts(t_dds, gene=which.max(res_humoral$log2FoldChange), intgroup="condition")
+#plotCounts(t_dds, gene=which.max(res$log2FoldChange), intgroup="condition")
 plotCounts(t_dds, gene=which.min(res$padj), intgroup="groups")
 #plotCounts(t_dds, gene=rownames(res)[which.min(res$padj[which.max(res$log2FoldChange)])], intgroup="condition")
 ```
 **Визуализация в виде боксплотов**
 
 ```{r}
-# gene_idx <- which.min(res_humoral$padj)
-# gene_name <- rownames(res_humoral)[gene_idx]  
+# gene_idx <- which.min(res$padj)
+# gene_name <- rownames(res)[gene_idx]  
 
 selected_miRNA <- "Tyr_Comb_1"
 
@@ -898,7 +898,7 @@ plt <- EnhancedVolcano(res,
                 subtitle = NULL) 
 
 plt
-ggsave("./pictures_cysts/trna_VolcanoPlot_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+ggsave("./pictures_cysts/trna_VolcanoPlot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 **Plot a heatmap of diff expressed genes**
 ```{r}

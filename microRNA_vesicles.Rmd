@@ -154,14 +154,33 @@ plt <- ggplot(anno_long, aes(x = Sample.name.s., y = Proportion, fill = RNA_Type
 plt
 ggsave("./pictures/barplot_alldataset_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
+```{r}
+merged_df <- left_join(anno, coldata, by = c("Sample.name.s." = "sample"))
+coldata$new_col <- paste0(coldata$condition, "_type", coldata$type)
+summed_anno <- merged_df %>%
+  group_by(new_col) %>%
+  summarise(across(where(is.numeric), sum))
+
+summed_anno_plt <- summed_anno %>%
+  pivot_longer(cols = -new_col, names_to = "RNA_Type", values_to = "Count")
+
+plt <- ggplot(summed_anno_plt, aes(x = new_col, y = Count, fill = RNA_Type)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(x = "Sample", y = "Proportion") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_brewer(palette = "Set3")
+
+plt
+ggsave("./pictures/vesicles_barplot_alldataset_normalised_by groups.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+
 ## Визуализация данных: весь датасет ##
 ```{r}
 coldata$condition <- relevel(coldata$condition, ref = "before")
 modelMatrix <- model.matrix(~type*condition + patient, data = coldata)
 modelMatrix
 ```
-
-
 ```{r}
 dds <- DESeqDataSetFromMatrix(countData = counts, 
                               colData = coldata, 
