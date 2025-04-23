@@ -32,6 +32,7 @@ library(patchwork)
 library(dbplyr)
 library(GGally) 
 library(ggVennDiagram)
+library(Rtsne)
 ```
 ### Импортируем данные ###
 **Таблица фенотипов:**
@@ -297,6 +298,30 @@ plt <- ggpairs(
 plt
 ggsave("./pictures_transpl/transpl_PCA plot 4 comp.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
+```{r}
+tsne_input <- t(as.matrix(collapsed_df[, -1]))  # исключаем колонку ncRNA
+
+#перемешиваем
+set.seed(42)  # для воспроизводимости
+tsne_result <- Rtsne(tsne_input, dims = 2, perplexity = 5, verbose = TRUE, max_iter = 500)
+
+#data.frame
+tsne_df <- data.frame(
+  Sample = rownames(tsne_input),
+  tSNE1 = tsne_result$Y[,1],
+  tSNE2 = tsne_result$Y[,2]
+)
+
+# Добавим аннотацию
+tsne_df <- merge(tsne_df, coldata, by.x = "Sample", by.y = "sample")
+
+# Визуализация
+ggplot(tsne_df, aes(x = tSNE1, y = tSNE2, color = condition)) +
+  geom_point(size = 3, alpha = 0.8) +
+  theme_minimal() +
+  labs(title = "t-SNE plot", x = "tSNE 1", y = "tSNE 2")
+```
+
 **Plot a heatmap of 50 most expressed genes**
 Этот heatmap отражает уровни экспрессии генов, а не разницу между группами.
 Цвета не означают up- или down-регуляцию в сравнении с контрольной группой, потому что heatmap показывает абсолютные значения экспрессии, а не fold change!
@@ -818,62 +843,6 @@ plt <- dotplot(GO_enrich_up_TCAD_KEGG, showCategory = 20) +
 plt
 ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_UP_TCAD_KEGG.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
-```{r}
-# DEG overlap between both timepoints
-trans48 <- read.csv("./ligament_dif48h_vs_undif.csv")
-trans48_deg <- subset(trans48, trans48$padj < 0.05 & abs(trans48$log2FoldChange) > 1)
-trans48_genes <- trans48_deg$X
-
-trans10 <- read.csv("./ligament_dif10d_vs_undif.csv")
-trans10_deg <- subset(trans10, trans10$padj < 0.05 & abs(trans10$log2FoldChange) > 1)
-trans10_genes <- trans10_deg$X
-
-myCol <- brewer.pal(3, "Pastel2")
-
-# Пример с графиком Венн
-venn <- venn.diagram(
-  x = list(trans48_genes, trans10_genes),
-  category.names = c("Transcriptome (48h)", "Transcriptome (10d)"),
-  filename = NULL,  # Не сохраняем в файл, отображаем на экране
-  output = TRUE,
-  
-  # Output features
-  imagetype = "png", 
-  height = 4000, 
-  width = 4000, 
-  resolution = 500,
-  compression = "lzw",
-  
-  # Circles
-  lwd = 1,
-  lty = 'solid',
-  fill = myCol[1:2],
-  
-  # Numbers
-  cex = .7,
-  fontface = "bold",
-  fontfamily = "sans",
-  main.col = "black",
-  
-  # Set names
-  cat.cex = 0.5,
-  cat.fontface = "bold",
-  cat.default.pos = "text",
-  print.mode = c("raw", "percent"),
-  cat.pos = c(0, 180), 
-  sigdigs = 2,
-  cat.fontfamily = "sans"
-)
-
-# Отображаем диаграмму
-grid.draw(venn)
-
-Reduce(intersect, list(trans48_genes, 
-                       trans10_genes))
-```
-
-
-
 *Справка по базам данным, по которым можно провести обогащение*
 1. C1 (Genomic Signature Prediction)
 	•	Включает генетические сигнатуры, которые используются для предсказания различных фенотипов или состояний, основанных на генетической информации. 299
@@ -907,3 +876,107 @@ Reduce(intersect, list(trans48_genes,
 	•	Наборы генов, ассоциированные с различными типами клеток 700
 9. H (Hallmark Gene Sets)
 	•	Включает Hallmark Gene Sets, которые представляют ключевые биологические процессы и функции, общие для множества типов клеток и состояний. 50
+	
+```{r}
+all_df <- read.csv("data/mapped.csv", header = TRUE, sep = ",")
+all_df <- all_df[, -c(1, 2)]
+cols <- c("exact.miRNA", "hairpin.miRNA", "mature.tRNA", "primary.tRNA", "snoRNA", "rRNA", "ncrna.others", "mRNA", "isomiR.miRNA")
+all_df[cols] <- lapply(all_df[cols], function(x) ifelse(x == "", NA, x))
+str(all_df)
+```
+
+```{r}
+all_df$merged_col <- apply(all_df[, c("exact.miRNA", "hairpin.miRNA", "mature.tRNA", "primary.tRNA", "snoRNA", "rRNA", "ncrna.others", "mRNA", "isomiR.miRNA")], 1, function(x) na.omit(x)[1])
+all_df <- all_df[, -c(1:9)]
+all_df
+```
+
+```{r}
+collapsed_df <- all_df %>%
+  group_by(merged_col) %>%
+  summarise(across(everything(), sum, na.rm = FALSE)) %>%
+  as.data.frame()  
+rownames(collapsed_df) <- collapsed_df$merged_col
+collapsed_df$merged_col <- NULL 
+# write.csv(collapsed_df, file="./collapsed_df.csv")
+```
+
+```{r}
+# collapsed_df <- read.csv("./collapsed_df.csv", header = TRUE, sep = ",")
+rownames(collapsed_df) <- collapsed_df$X
+collapsed_df$X <- NULL
+collapsed_df
+```
+```{r}
+colnames(collapsed_df) <- gsub("^X", "", colnames(collapsed_df))
+common_samples <- intersect(colnames(collapsed_df), coldata$sample)
+collapsed_df <- rownames_to_column(collapsed_df, var = "ncRNA")
+
+collapsed_df <- collapsed_df[, c("ncRNA", common_samples)] 
+# collapsed_df <- collapsed_df[, rownames(coldata)] #ранжирую по колонке в counts так же как и названия строк в coldata
+rownames(collapsed_df) <- collapsed_df$ncRNA
+collapsed_df$ncRNA <- NULL
+head(collapsed_df)
+```
+t-SNE = t-distributed Stochastic Neighbor Embedding
+
+Это алгоритм для понижения размерности, часто используемый для визуализации высокоразмерных данных 
+Как t-SNE работает:
+	1.	Считает расстояния между всеми парами точек во входных данных.
+	2.	Строит вероятности того, что точка A выберет точку B как соседа. (насколько точка A считает точку B близкой?)
+	•	Точки, которые были близки → останутся рядом.
+	•	Далёкие точки → могут оказаться где угодно.
+Главное не измерять расстояния между кластерами — это может быть иллюзией.
+
+https://distill.pub/2016/misread-tsne/
+```{r}
+tsne_input <- t(as.matrix(collapsed_df[, -1]))  # исключаем колонку ncRNA
+
+#самое сомнительное
+set.seed(41)  # для воспроизводимости
+tsne_result <- Rtsne(tsne_input, dims = 2, perplexity = 5, verbose = TRUE, max_iter = 500)
+
+
+tsne_df <- data.frame(
+  Sample = rownames(tsne_input),
+  tSNE1 = tsne_result$Y[,1],
+  tSNE2 = tsne_result$Y[,2]
+)
+
+tsne_df <- merge(tsne_df, coldata, by.x = "Sample", by.y = "sample")
+tsne_df$Sample <- gsub("_.*", "", tsne_df$Sample)
+
+plt <- ggplot(tsne_df, aes(x = tSNE1, y = tSNE2, color = condition)) +
+  geom_point(size = 3, alpha = 0.8) +
+  geom_text(aes(label=Sample), size=3, vjust=1.5) +
+  theme_minimal() +
+  labs(title = "t-SNE plot", x = "tSNE 1", y = "tSNE 2")
+
+plt
+ggsave("./pictures_transpl2/transpl_tSNE_plot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+```{r}
+tsne_input <- t(as.matrix(counts[, -1]))  # исключаем колонку ncRNA
+
+#самое сомнительное
+set.seed(41) 
+tsne_result <- Rtsne(tsne_input, dims = 2, perplexity = 5, verbose = TRUE, max_iter = 500)
+
+tsne_df <- data.frame(
+  Sample = rownames(tsne_input),
+  tSNE1 = tsne_result$Y[,1],
+  tSNE2 = tsne_result$Y[,2]
+)
+
+tsne_df <- merge(tsne_df, coldata, by.x = "Sample", by.y = "sample")
+tsne_df$Sample <- gsub("_.*", "", tsne_df$Sample)
+
+plt <- ggplot(tsne_df, aes(x = tSNE1, y = tSNE2, color = condition)) +
+  geom_point(size = 3, alpha = 0.8) +
+  geom_text(aes(label=Sample), size=3, vjust=1.5) +
+  theme_minimal() +
+  labs(title = "t-SNE plot", x = "tSNE 1", y = "tSNE 2")
+plt
+ggsave("./pictures_transpl2/transpl_tSNE_plot_only_miR.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+

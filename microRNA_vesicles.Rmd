@@ -161,13 +161,19 @@ summed_anno <- merged_df %>%
   group_by(new_col) %>%
   summarise(across(where(is.numeric), sum))
 
-summed_anno_plt <- summed_anno %>%
-  pivot_longer(cols = -new_col, names_to = "RNA_Type", values_to = "Count")
+anno_long <- summed_anno %>%
+pivot_longer(cols = -new_col, names_to = "RNA_Type", values_to = "Count")
 
-plt <- ggplot(summed_anno_plt, aes(x = new_col, y = Count, fill = RNA_Type)) +
+# anno_long <- summed_anno %>%
+#   rowwise() %>%
+#   mutate(across(-new_col, ~ . / sum(c_across(-new_col)))) %>% 
+#   ungroup() %>%
+#   pivot_longer(cols = -new_col, names_to = "RNA_Type", values_to = "Proportion")
+
+plt <- ggplot(anno_long, aes(x = new_col, y = Count, fill = RNA_Type)) +
   geom_bar(stat = "identity") +
   theme_minimal() +
-  labs(x = "Sample", y = "Proportion") +
+  labs(x = "Sample", y = "Count") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_fill_brewer(palette = "Set3")
 
@@ -1166,6 +1172,59 @@ plt <- emapplot(GO_enrich_UP16_MF,
 plt
 
 ggsave("./pictures/GO_enrichment_emapplot_MF_up_type16.tiff", plot = plt, width = 16, height = 10, dpi = 300)
+```
+```{r}
+all_df <- read.csv("data/mapped.csv", header = TRUE, sep = ",")
+all_df <- all_df[, -c(1, 2)]
+cols <- c("exact.miRNA", "hairpin.miRNA", "mature.tRNA", "primary.tRNA", "snoRNA", "rRNA", "ncrna.others", "mRNA", "isomiR.miRNA")
+all_df[cols] <- lapply(all_df[cols], function(x) ifelse(x == "", NA, x))
+str(all_df)
+```
+```{r}
+all_df$merged_col <- apply(all_df[, c("exact.miRNA", "hairpin.miRNA", "mature.tRNA", "primary.tRNA", "snoRNA", "rRNA", "ncrna.others", "mRNA", "isomiR.miRNA")], 1, function(x) na.omit(x)[1])
+all_df <- all_df[, -c(1:9)]
+all_df
+```
+```{r}
+collapsed_df <- all_df %>%
+  group_by(merged_col) %>%
+  summarise(across(everything(), sum, na.rm = FALSE)) %>%
+  as.data.frame()  
+rownames(collapsed_df) <- collapsed_df$merged_col
+collapsed_df$merged_col <- NULL 
+collapsed_df
+```
+```{r}
+colnames(collapsed_df) <- gsub("^X", "", colnames(collapsed_df))
+common_samples <- intersect(colnames(collapsed_df), coldata$sample)
+collapsed_df <- rownames_to_column(collapsed_df, var = "ncRNA")
+
+collapsed_df <- collapsed_df[, c("ncRNA", common_samples)] 
+# collapsed_df <- collapsed_df[, rownames(coldata)] #ранжирую по колонки в counts так же как и названия строк в coldata
+head(collapsed_df)
+```
+```{r}
+rlt <- rlog(dds)  #rlog Transformation
+meanSdPlot(assay(rlt)) 
+
+```
+
+
+```{r}
+pcaData <- plotPCA(rlt, intgroup=c("condition", "type", "patient"), returnData = TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+
+pcaData$condition_type <- paste(pcaData$condition, pcaData$type, sep = "_")
+
+ggplot(pcaData, aes(PC1, PC2, shape = patient, color = condition_type)) +
+  geom_point(size = 3) +
+  xlab(paste0("PC1: ", percentVar[1], "%")) +
+  ylab(paste0("PC2: ", percentVar[2], "%")) + 
+  coord_fixed() +
+  theme_bw() +
+  ggtitle("PCA plot for all dataset before removing donor effect")+
+  scale_color_brewer(palette = "Set2")
+```
 ```
 
 

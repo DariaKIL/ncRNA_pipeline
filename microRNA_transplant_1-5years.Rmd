@@ -171,6 +171,33 @@ plt
 ggsave("./pictures_transpl2/transpl_PCA plot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
 ```
 
+```{r}
+tsne_input <- t(as.matrix(counts[, -1]))  # исключаем колонку ncRNA
+
+#самое сомнительное
+set.seed(41)  # для воспроизводимости
+tsne_result <- Rtsne(tsne_input, dims = 2, perplexity = 4, verbose = TRUE, max_iter = 500)
+
+
+tsne_df <- data.frame(
+  Sample = rownames(tsne_input),
+  tSNE1 = tsne_result$Y[,1],
+  tSNE2 = tsne_result$Y[,2]
+)
+
+tsne_df <- merge(tsne_df, coldata, by.x = "Sample", by.y = "sample")
+tsne_df$Sample <- gsub("_.*", "", tsne_df$Sample)
+
+plt <- ggplot(tsne_df, aes(x = tSNE1, y = tSNE2, color = group)) +
+  geom_point(size = 3, alpha = 0.8) +
+  geom_text(aes(label=Sample), size=3, vjust=1.5) +
+  theme_minimal() +
+  labs(title = "t-SNE plot", x = "tSNE 1", y = "tSNE 2")
+plt
+ggsave("./pictures_transpl2/transpl_tSNE_plot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+```
+
+
 **Plot a heatmap of 50 most expressed genes**
 Этот heatmap отражает уровни экспрессии генов, а не разницу между группами.
 Цвета не означают up- или down-регуляцию в сравнении с контрольной группой, потому что heatmap показывает абсолютные значения экспрессии, а не fold change!
