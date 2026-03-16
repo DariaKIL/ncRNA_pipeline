@@ -14,13 +14,13 @@ This repository contains analysis workflows and exploratory data analysis for se
 	
 ### 📊 Visualization
 
-- [MicroRNA in Vesicles](https://DariaKIL.github.io/Micro-RNA_cardiology/microRNA_vesicles.nb.html)  
+- [MicroRNA in Vesicles](https://DariaKIL.github.io/ncRNA_pipeline/Vesicles_CABG/microRNA_vesicles.nb.html)
 
-- [MicroRNA in Heart Transplants](https://DariaKIL.github.io/Micro-RNA_cardiology/microRNA_transplant_all.nb.html)  
+- [tRNA in Vesicles](https://DariaKIL.github.io/ncRNA_pipeline/Vesicles_CABG/tRNA_vesicles.nb.html) 
 
-- [tRNA in Vesicles](https://DariaKIL.github.io/Micro-RNA_cardiology/tRNA_vesicles.nb.html)  
+- [MicroRNA in Heart Transplants](https://DariaKIL.github.io/ncRNA_pipeline/Transplantation/microRNA_transplant_all.nb.html)  
 
-- [tRNA in Heart Transplants](https://DariaKIL.github.io/Micro-RNA_cardiology/tRNA_transplant.nb.html)  
+- [tRNA in Heart Transplants](https://DariaKIL.github.io/ncRNA_pipeline/Transplantation/tRNA_transplant.nb.html)  
 
-- [ncRNA (micro-RNA and tRNA) from cysts materials](https://DariaKIL.github.io/Micro-RNA_cardiology/ncRNA_cysts.nb.html)  
+- [ncRNA (micro-RNA and tRNA) from cysts materials](https://DariaKIL.github.io/ncRNA_pipeline/Cysts/ncRNA_cysts.nb.html)  
 
