@@ -28,10 +28,23 @@ This repository contains analysis workflows and exploratory data analysis for se
 - [ncRNA (micro-RNA and tRNA) from cysts materials](https://DariaKIL.github.io/ncRNA_pipeline/Cysts/ncRNA_cysts.nb.html)  
 
 **Repository structure (planned)**
+```
 ncRNA_pipeline
 │
-├── configs/        # dataset-specific configuration files
-├── src/            # reusable analysis and plotting functions
-├── data/           # input datasets (not always included in repo)
-├── results/        # generated analysis outputs
-└── reports/        # R Markdown / notebook visualizations
+├── configs/
+│   ├── vesicles.yaml
+│   ├── transplant.yaml
+│   └── cysts.yaml
+│
+├── src/
+│   ├── analysis_functions.R
+│   └── plotting_functions.R
+│
+├── reports/
+│   ├── Vesicles_CABG/
+│   ├── Transplantation/
+│   └── Cysts/
+│
+├── results/
+└── README.md
+``` 
