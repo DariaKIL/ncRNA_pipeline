@@ -35,30 +35,14 @@ library(ggVennDiagram)
 library(Rtsne)
 ```
 ### Импортируем данные ###
-**Таблица фенотипов:**
-```{r}
-setwd("/Users/dariakilina/GitHub/Micro-RNA_cardiology")
-coldata <- read_tsv("data/phenotable.tsv", show_col_types = FALSE)
-coldata$group <- NULL  
-coldata
-```
-**Таблица каунтов:**
-```{r}
-counts <- read.csv("data/miR.Counts.csv", header = TRUE, sep = ",")
-counts <- column_to_rownames(counts, var = "miRNA")
-head(counts)
-```
-**Таблица каунтов только для выбранных образцов:**
-```{r}
-colnames(counts) <- gsub("^X", "", colnames(counts))
 
-counts_samples <- colnames(counts)
-phenotable_samples <- coldata$sample
-common_samples <- intersect(counts_samples, phenotable_samples)
-
-counts <- counts[, c(counts$miRNA, common_samples)]  
-counts <- counts[, coldata$sample] #ранжирую по колонки в counts так же как и названия строк в coldata
-head(counts)
+```{r}
+setwd("/Users/dariakilina/GitHub/ncRNA_pipeline")
+source("config.R")
+source("src/Data_processing.R")
+data <- load_and_process_data()
+counts <- data$counts
+phenotable <- data$phenotype
 ```
 **Аnnotation report:**
 ```{r}

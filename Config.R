@@ -1,9 +1,6 @@
 # config.R
-# Глобальные параметры для анализа
 
-# ПУТИ К ФАЙЛАМ
-
-DATA_DIR <- "data_all"
+DATA_DIR <- "data"
 
 PHENOTYPE_FILE <- file.path(DATA_DIR, "phenotable.tsv")
 COUNTS_FILE <- file.path(DATA_DIR, "miR.Counts.csv")
@@ -11,39 +8,35 @@ COUNTS_FILE <- file.path(DATA_DIR, "miR.Counts.csv")
 OUTPUT_DIR <- "results"
 FIGURES_DIR <- "figures"
 
-# Создание директорий если их нет
+# Create directories if they do not exist
 dir.create(OUTPUT_DIR, showWarnings = FALSE)
 dir.create(FIGURES_DIR, showWarnings = FALSE)
 
-
-# ПАРАМЕТРЫ ФИЛЬТРАЦИИ
-# Минимальный уровень экспрессии
+# FILTERING PARAMETERS
+# Minimum expression level
 MIN_COUNTS <- 10
 
-# Минимальное количество образцов
-MIN_SAMPLES <- 3
-
-# Порог для значимости
+# Significance threshold
 PADJ_THRESHOLD <- 0.05
 LOG2FC_THRESHOLD <- 1.0
 
-# Порог для "высокой" экспрессии (для Venn диаграммы)
+# Threshold for "high" expression (for Venn diagram)
 HIGH_EXPRESSION_THRESHOLD <- 150
 
-# ПАРАМЕТРЫ НОРМАЛИЗАЦИИ
+# NORMALIZATION PARAMETERS
 
-# Метод трансформации: "rlog" или "vst"
+# Transformation method: "rlog" or "vst"
 TRANSFORM_METHOD <- "rlog"
 
-# ПАРАМЕТРЫ ВИЗУАЛИЗАЦИИ
+# VISUALIZATION PARAMETERS
 
-# Количество топ генов для heatmap
+# Number of top genes for heatmap
 TOP_GENES_HEATMAP <- 50
 
-# Размер текста на графиках
+# Base text size for plots
 BASE_TEXT_SIZE <- 12
 
-# Цветовая палитра для групп
+# Color palette for groups
 GROUP_COLORS <- c(
   "no_complications" = "#4DAF4A",
   "humoral" = "#E41A1C",
@@ -51,15 +44,15 @@ GROUP_COLORS <- c(
   "TCAD" = "#FF7F00"
 )
 
-# ПАРАМЕТРЫ ENRICHMENT АНАЛИЗА
+# ENRICHMENT ANALYSIS PARAMETERS
 
-# P-value cutoff для обогащения
+# P-value cutoff for enrichment
 ENRICH_PVAL_CUTOFF <- 0.05
 
-# Минимальный размер генного набора
+# Minimum gene set size
 MIN_GENESET_SIZE <- 10
 
-# Максимальный размер генного набора
+# Maximum gene set size
 MAX_GENESET_SIZE <- 500
 
 
@@ -71,7 +64,7 @@ CONTRASTS <- list(
 
 set.seed(42)
 
-# НЕОБХОДИМЫЕ БИБЛИОТЕКИ
+# REQUIRED LIBRARIES
 
 required_packages <- c(
   "DESeq2", "ggplot2", "pheatmap", "RColorBrewer", 
@@ -80,7 +73,7 @@ required_packages <- c(
   "org.Hs.eg.db", "multiMiR", "miRBaseConverter", "ggVennDiagram"
 )
 
-# Функция для установки недостающих пакетов
+# Function to install missing packages
 install_if_missing <- function(packages) {
   for (pkg in packages) {
     if (!requireNamespace(pkg, quietly = TRUE)) {
@@ -94,7 +87,7 @@ install_if_missing <- function(packages) {
   }
 }
 
-# Загрузка всех библиотек
+# Load all libraries
 suppressPackageStartupMessages({
   lapply(required_packages, library, character.only = TRUE)
 })
