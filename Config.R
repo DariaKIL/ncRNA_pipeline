@@ -1,10 +1,8 @@
 # config.R
 
-DATA_DIR <- "data"
-
-COUNTS_MIR_FILE <- file.path(DATA_DIR, "/raw/miR.Counts.csv")
-COUNTS_TRF_FILE <- file.path(DATA_DIR, "/raw/tRF.Counts.csv")
-ANNOTATION_FILE <- file.path(DATA_DIR, "/raw/annotation.report.csv")
+COUNTS_MIR_FILE <- file.path("data/raw/miR.Counts.csv")
+COUNTS_TRF_FILE <- file.path("data/raw/tRF.Counts.csv")
+ANNOTATION_FILE <- file.path("data/raw/annotation.report.csv")
 
 
 # FILTERING PARAMETERS

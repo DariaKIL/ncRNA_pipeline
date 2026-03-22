@@ -38,29 +38,16 @@ library(Rtsne)
 
 ```{r}
 setwd("/Users/dariakilina/GitHub/ncRNA_pipeline")
-source("/config.R")
+source("config.R")
+source("Transplantation/config_t.R")
 source("src/data_processing.R")
 data <- load_and_process_data()
 counts <- data$counts
-phenotable <- data$phenotype
-```
-**Аnnotation report:**
-```{r}
-anno <- read.csv("data/annotation.report.csv", header = TRUE, sep = ",")
-anno <- anno[, -c(2:5, 7, 15)]
- 
-common_samples <- intersect(anno$Sample.name.s., coldata$sample)
-
-anno <- anno[anno$Sample.name.s. %in% common_samples, ]
-anno <- anno[match(coldata$sample, anno$Sample.name.s.), ] #ранжирую по колонки в counts так же как и названия строк в coldata
-anno
+phenotable <- data$phenotable
 ```
 ```{r}
-merged_df <- left_join(anno, coldata, by = c("Sample.name.s." = "sample"))
-summed_anno <- merged_df %>%
-  group_by(condition) %>%
-  summarise(across(where(is.numeric), sum))
-summed_anno
+setwd("/Users/dariakilina/GitHub/ncRNA_pipeline")
+summed_anno <- load_sample_annotation(phenotable = data$phenotable)
 ```
 **Диаграмма Венна: микроРНК с высокой экспрессией (>150 каунтов)**
 ```{r}

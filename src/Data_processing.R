@@ -164,19 +164,16 @@ load_and_process_data <- function() {
 
 #' Load and align sample annotation
 #'
-#' @param annotation_file Path to annotation.report.csv
+#' @param ANNOTATION_FILE Path to annotation.report.csv
 #' @param phenotable Sample phenotype table
 #' @return Annotation table aligned with phenotable
-load_sample_annotation <- function(annotation_file, phenotable) {
+load_sample_annotation <- function(annotation_file = ANNOTATION_FILE,
+                                    phenotable) {
   
   cat("📋 Loading sample annotation...\n")
-  cat("   File:", annotation_file, "\n")
+  cat("   File:", ANNOTATION_FILE, "\n")
   
-  if (!file.exists(annotation_file)) {
-    stop("❌ Annotation file not found: ", annotation_file)
-  }
-  
-  anno <- read.csv(annotation_file, header = TRUE)
+  anno <- read.csv(ANNOTATION_FILE, header = TRUE)
   
   cat(sprintf("   ✓ Loaded %d samples × %d columns\n", nrow(anno), ncol(anno)))
   

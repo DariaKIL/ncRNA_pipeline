@@ -1,8 +1,6 @@
-# config.R
+# Transplantation/config_t.R
 
-DATA_DIR <- "Transplantation/data"
-
-PHENOTYPE_FILE <- file.path(DATA_DIR, "phenotable.tsv")
+PHENOTYPE_FILE <- file.path("Transplantation/data/phenotable.tsv")
 
 OUTPUT_DIR <- "results"
 FIGURES_DIR <- "figures"
