@@ -1,62 +1,72 @@
-#' Create Venn diagram for miRNA expression
-#'
-#' @param data Data frame with miRNA expression data
-#' @param condition_col Column name for condition
-#' @param count_threshold Minimum count threshold
-#' @param output_file Output file path
-#' @return ggplot object
-create_venn_diagram <- function(data, condition_col = "condition", count_threshold = 150, output_file = NULL) {
-  # Process data for Venn diagram
-  summed_venn <- data %>%
-    group_by(!!sym(condition_col)) %>%
-    summarise(across(where(is.numeric), sum)) %>%
-    pivot_longer(cols = -!!sym(condition_col), names_to = "miRNA", values_to = "counts") %>%
+# Create Venn diagram for miRNA expression
+
+create_venn_diagram <- function(
+    counts,
+    phenotable,
+    condition_col = "condition",
+    count_threshold = HIGH_EXPRESSION_THRESHOLD,
+    output_file = NULL
+) {
+  
+  # Convert counts to sample-level dataframe
+  df <- counts %>%
+    as.data.frame() %>%
+    t() %>%
+    as.data.frame()
+  df$sample <- rownames(df)
+  
+  # Add condition
+  df <- df %>%
+    left_join(phenotable[, c("sample", condition_col)], by = "sample")
+  
+  # Summarise counts per condition
+  summed <- df %>%
+    group_by(.data[[condition_col]]) %>%
+    summarise(across(where(is.numeric), sum), .groups = "drop")
+  
+  # Long format
+  long_df <- summed %>%
+    pivot_longer(
+      cols = -all_of(condition_col),
+      names_to = "feature",
+      values_to = "counts"
+    ) %>%
     filter(counts > count_threshold)
   
-  # Extract miRNAs for each condition
-  venn_no_c <- summed_venn[summed_venn[[condition_col]] == "NR", ]$miRNA 
-  venn_cell <- summed_venn[summed_venn[[condition_col]] == "ACR", ]$miRNA
-  venn_hum <- summed_venn[summed_venn[[condition_col]] == "AMR", ]$miRNA 
-  venn_CAV <- summed_venn[summed_venn[[condition_col]] == "CAV", ]$miRNA 
+  # Build list automatically
+  venn_list <- split(long_df$feature, long_df[[condition_col]])
   
-  # Create Venn list
-  venn_list <- list(
-    Non = venn_no_c,
-    Сellular = venn_cell,
-    Humoral = venn_hum,
-    CAV = venn_CAV
-  )
-  
-  # Create plot
+  # Plot
   plt <- ggvenn(
     venn_list,
-    fill_color = c("#4CAF50", "#F44336", "#2196F3", "#FF9800"),
     fill_alpha = 0.5,
+    fill_color = GROUP_COLORS,
     stroke_size = 0,
     set_name_size = 5,
     text_size = 4
   )
   
-  # Save if output file specified
+  # Save
   if (!is.null(output_file)) {
-    ggsave(output_file, plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+    ggsave(output_file, plt, width = 8, height = 6, dpi = 300, bg = "white")
+    cat("   ✓ Saved to:", output_file, "\n")
   }
   
-  return(plt)
+  return(list(
+    plot = plt,
+    venn_list = venn_list
+  ))
 }
 
-#' Create bar plot for all dataset
-#'
-#' @param data Data frame with annotation data
-#' @param output_file Output file path
-#' @return ggplot object
+
+# Create bar plot for all dataset
 create_barplot_all_dataset <- function(data, output_file = NULL) {
   # Create long format data
   anno_long <- data %>%
-    pivot_longer(cols = -Sample.name.s., names_to = "RNA_Type", values_to = "Count")
+    pivot_longer(cols = -sample, names_to = "RNA_Type", values_to = "Count")
   
   # Create plot
-  plt <- ggplot(anno_long, aes(x = Sample.name.s., y = Count, fill = RNA_Type)) +
+  plt <- ggplot(anno_long, aes(x = sample, y = Count, fill = RNA_Type)) +
     geom_bar(stat = "identity") +
     theme_minimal() +
     labs(x = "Sample", y = "Read Count") +
@@ -71,21 +81,17 @@ create_barplot_all_dataset <- function(data, output_file = NULL) {
   return(plt)
 }
 
-#' Create normalized bar plot for all dataset
-#'
-#' @param data Data frame with annotation data
-#' @param output_file Output file path
-#' @return ggplot object
+#Create normalized bar plot for all dataset
 create_barplot_all_dataset_normalized <- function(data, output_file = NULL) {
   # Create normalized data
   anno_long <- data %>%
     rowwise() %>%
-    mutate(across(-Sample.name.s., ~ . / sum(c_across(-Sample.name.s.)))) %>% 
+    mutate(across(-sample, ~ . / sum(c_across(-sample)))) %>% 
     ungroup() %>%
-    pivot_longer(cols = -Sample.name.s., names_to = "RNA_Type", values_to = "Proportion")
+    pivot_longer(cols = -sample, names_to = "RNA_Type", values_to = "Proportion")
   
   # Create plot
-  plt <- ggplot(anno_long, aes(x = Sample.name.s., y = Proportion, fill = RNA_Type)) +
+  plt <- ggplot(anno_long, aes(x = sample, y = Proportion, fill = RNA_Type)) +
     geom_bar(stat = "identity") +
     theme_minimal() +
     labs(x = "Sample", y = "Proportion") +
@@ -100,86 +106,99 @@ create_barplot_all_dataset_normalized <- function(data, output_file = NULL) {
   return(plt)
 }
 
-#' Create bar plot for dataset by groups
-#'
-#' @param data Data frame with summed annotation data
-#' @param output_file Output file path
-#' @return ggplot object
-create_barplot_by_groups <- function(data, output_file = NULL) {
-  # Create long format data
-  summed_anno_plt <- data %>%
-    pivot_longer(cols = -condition, names_to = "RNA_Type", values_to = "Count")
+# Create bar plot for dataset by groups
+
+create_grouped_barplots <- function(data, phenotable, condition_col = "condition", output_prefix = NULL) {
   
-  # Create plot
-  plt <- ggplot(summed_anno_plt, aes(x = condition, y = Count, fill = RNA_Type)) +
+  # Add condition information from phenotable
+  data <- data %>%
+    left_join(phenotable[, c("sample", condition_col)], by = "sample")
+  
+  # Identify columns with numeric count data
+  count_cols <- setdiff(colnames(data), c("sample", condition_col))
+  
+  ## 1. Plot with raw counts
+  data_long <- data %>%
+    pivot_longer(
+      cols = all_of(count_cols),
+      names_to = "RNA_Type",
+      values_to = "Count"
+    )
+  
+  plt_counts <- ggplot(data_long, aes(x = .data[[condition_col]], y = Count, fill = RNA_Type)) +
     geom_bar(stat = "identity") +
     theme_minimal() +
-    labs(x = "Sample", y = "Proportion") +
+    labs(x = "Condition", y = "Count") +
     theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
     scale_fill_brewer(palette = "Set3")
   
-  # Save if output file specified
-  if (!is.null(output_file)) {
-    ggsave(output_file, plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+  # Save raw counts plot if output prefix is provided
+  if (!is.null(output_prefix)) {
+    ggsave(paste0(output_prefix, "_counts.png"), plt_counts, width = 8, height = 6, dpi = 300, bg = "white")
   }
   
-  return(plt)
+  ## 2. Plot with normalized proportions per group
+  # First, sum counts within each group
+  data_norm_group <- data %>%
+    group_by(.data[[condition_col]]) %>%
+    summarise(across(all_of(count_cols), sum), .groups = "drop") %>%
+    # Normalize counts to proportions within each group
+    rowwise() %>%
+    mutate(across(all_of(count_cols), ~ . / sum(c_across(all_of(count_cols))))) %>%
+    ungroup() %>%
+    # Convert to long format for plotting
+    pivot_longer(
+      cols = all_of(count_cols),
+      names_to = "RNA_Type",
+      values_to = "Proportion"
+    )
+  
+  plt_prop <- ggplot(data_norm_group, aes(x = .data[[condition_col]], y = Proportion, fill = RNA_Type)) +
+    geom_bar(stat = "identity", position = "stack") +
+    theme_minimal() +
+    labs(x = "Condition", y = "Proportion") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_fill_brewer(palette = "Set3")
+  
+  # Save proportion plot if output prefix is provided
+  if (!is.null(output_prefix)) {
+    ggsave(paste0(output_prefix, "_proportion.png"), plt_prop, width = 8, height = 6, dpi = 300, bg = "white")
+  }
+  
+  # Return both plots in a list
+  return(list(counts = plt_counts, proportion = plt_prop))
 }
 
-#' Create normalization plot
-#'
-#' @param raw_counts Raw counts matrix
-#' @param normalized_counts Normalized counts matrix
-#' @param output_file Output file path
-#' @return ggplot object
-create_normalization_plot <- function(raw_counts, normalized_counts, output_file = NULL) {
-  # Create data frame
-  df <- data.frame(
-    Sample = rep(colnames(raw_counts), 2),
-    Counts = c(colSums(raw_counts), colSums(normalized_counts)),
-    Type = rep(c("Raw", "Normalized"), each = ncol(raw_counts))
-  )
-  
-  # Create plot
-  plt <- ggplot(df, aes(x = Sample, y = Counts, fill = Type)) +
-    geom_bar(stat = "identity", position = "dodge") +
-    theme_minimal() +
-    labs(title = "Counts before and after normalization", x = "Sample", y = "Total Counts") +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-  
-  # Save if output file specified
-  if (!is.null(output_file)) {
-    ggsave(output_file, plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-  }
-  
-  return(plt)
-}
+
 
 #' Create PCA plot
-#'
-#' @param rlt rlog transformed data
-#' @param coldata Phenotype data
-#' @param output_file Output file path
-#' @return ggplot object
-create_pca_plot <- function(rlt, coldata, output_file = NULL) {
-  # Create PCA data
-  pcaData <- plotPCA(rlt, intgroup=c("condition"), returnData = TRUE)
-  percentVar <- round(100 * attr(pcaData, "percentVar"))
+
+create_pca_plot <- function(rlt, condition_col = "condition", output_file = NULL) {
   
-  # Add sample names
-  pcaData$sample <- gsub("_.*", "", coldata$sample)
+  # Extract PCA data
+  pcaData <- plotPCA(rlt, intgroup = condition_col, returnData = TRUE)
+  percentVar <- round(100 * attr(pcaData, "percentVar"))
+  pcaData$sample <- gsub("_.*", "", rownames(pcaData))
   
   # Create plot
-  plt <- ggplot(pcaData, aes(PC1, PC2, color = condition)) +
-    geom_text(aes(label=sample), size=3, vjust=1.5) +
+  plt <- ggplot(pcaData, aes(PC1, PC2, color = .data[[condition_col]])) +
     geom_point(size = 3) +
+    geom_text_repel(
+      aes(label = pcaData$sample),
+      size = 3,
+      box.padding = 0.4,
+      point.padding = 0.3,
+      segment.color = "grey50",
+      segment.size = 0.4,
+      max.overlaps = Inf
+    ) +
     xlab(paste0("PC1: ", percentVar[1], "%")) +
-    ylab(paste0("PC2: ", percentVar[2], "%")) + 
+    ylab(paste0("PC2: ", percentVar[2], "%")) +
     coord_fixed() +
     theme_bw() +
     scale_color_brewer(palette = "Set2")
   
-  # Save if output file specified
+  # Save if needed
   if (!is.null(output_file)) {
     ggsave(output_file, plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
   }
@@ -187,90 +206,71 @@ create_pca_plot <- function(rlt, coldata, output_file = NULL) {
   return(plt)
 }
 
-#' Create PCA plot with multiple components
-#'
-#' @param rlt rlog transformed data
-#' @param coldata Phenotype data
-#' @param pcs_count Number of principal components
-#' @param output_file Output file path
-#' @return ggplot object
-create_pca_plot_multiple <- function(rlt, coldata, pcs_count = 4, output_file = NULL) {
-  # Create PCA result
-  pca_result <- prcomp(t(assay(rlt)), center = TRUE, scale. = TRUE)
+# Create heatmap of most variable genes
+create_heatmap_most_expressed <- function(rlt, top_n = 50, group_col = "condition", output_file = NULL) {
   
-  # Get explained variance
-  explained_variance_ratio <- pca_result$sdev^2 / sum(pca_result$sdev^2)
+  # Select most variable genes
+  vars <- apply(assay(rlt), 1, var)
+  select <- order(vars, decreasing = TRUE)[1:top_n]
   
-  # Create data frame
-  miRNA_pca_df <- as.data.frame(pca_result$x[, 1:pcs_count])
-  colnames(miRNA_pca_df) <- paste0("PC", 1:pcs_count, " (", round(explained_variance_ratio[1:pcs_count] * 100, 2), "%)")
-  miRNA_pca_df$Group <- paste(coldata$condition)
-  
-  # Create plot
-  plt <- ggpairs(
-    miRNA_pca_df, aes(color = Group, alpha = 0.7),
-    upper = list(continuous = wrap("cor", size = 3))
+  # Create sample labels: SampleID_Group
+  colnames(rlt) <- paste(
+    gsub("_.*", "", colnames(rlt)),
+    colData(rlt)[[group_col]],
+    sep = "_"
   )
   
-  # Save if output file specified
+  # Annotation for heatmap
+  df <- as.data.frame(colData(rlt)[group_col])
+  
+  # Heatmap
+  plt <- pheatmap::pheatmap(
+    assay(rlt)[select, ],
+    cluster_rows = TRUE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    annotation_col = df,
+    fontsize_row = 6
+    #scale = "row"
+  )
+  
+  # Save if needed
   if (!is.null(output_file)) {
-    ggsave(output_file, plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-  }
-  
-  return(plt)
-}
-
-#' Create heatmap of most expressed genes
-#'
-#' @param rlt rlog transformed data
-#' @param dds DESeqDataSet object
-#' @param output_file Output file path
-#' @return pheatmap object
-create_heatmap_most_expressed <- function(rlt, dds, output_file = NULL) {
-  # Select top 50 genes
-  select <- order(rowMeans(counts(dds,normalized=TRUE)), decreasing=TRUE)[1:50]
-  
-  # Create annotation data
-  df <- as.data.frame(colData(dds)$condition)
-  colnames(df) <- "condition"
-  rownames(df) <- colnames(counts(dds))
-  
-  # Create heatmap
-  plt <- pheatmap(assay(rlt)[select,], 
-           cluster_rows = TRUE, 
-           show_rownames = TRUE, 
-           cluster_cols = TRUE, 
-           annotation_col = df,
-           fontsize_row = 6)
-  
-  # Save if output file specified
-  if (!is.null(output_file)) {
-    ggsave(output_file, plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+    ggsave(output_file, plot = plt, width = 8, height = 6, dpi = 300)
   }
   
   return(plt)
 }
 
 #' Create sample distance heatmap
-#'
-#' @param rlt rlog transformed data
-#' @param output_file Output file path
-#' @return pheatmap object
-create_sample_distance_heatmap <- function(rlt, output_file = NULL) {
-  # Calculate distances
+
+create_sample_distance_heatmap <- function(rlt, group_col = "condition", output_file = NULL) {
+  
+  # Build sample labels: SampleName_Group
+  sample_labels <- paste(gsub("_.*", "", colnames(rlt)), colData(rlt)[[group_col]], sep = "_")
+  
+  # Calculate Euclidean distances between samples
   sampleDists <- dist(t(assay(rlt)))
   sampleDistMatrix <- as.matrix(sampleDists)
-  rownames(sampleDistMatrix) <- paste(rlt$condition)
-  colnames(sampleDistMatrix) <- paste(rlt$condition)
-  colors <- colorRampPalette(rev(brewer.pal(9, "Blues")) )(255)
+  rownames(sampleDistMatrix) <- sample_labels
+  colnames(sampleDistMatrix) <- sample_labels
   
-  # Create heatmap
+  # Annotation for heatmap
+  annotation_df <- data.frame(Group = colData(rlt)[[group_col]])
+  rownames(annotation_df) <- sample_labels
+  
+  # Colors
+  colors <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
+  
+  # Plot
   plt <- pheatmap(sampleDistMatrix,
-           clustering_distance_rows = "euclidean",
-           clustering_distance_cols = "euclidean",
-           color = colors)
+                  clustering_distance_rows = "euclidean",
+                  clustering_distance_cols = "euclidean",
+                  annotation_col = annotation_df,
+                  annotation_row = annotation_df,
+                  color = colors)
   
-  # Save if output file specified
+  # Save if requested
   if (!is.null(output_file)) {
     ggsave(output_file, plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
   }
@@ -279,21 +279,31 @@ create_sample_distance_heatmap <- function(rlt, output_file = NULL) {
 }
 
 #' Create MA plot
-#'
-#' @param res DESeq2 results object
-#' @param alpha Significance threshold
-#' @param ylim Y-axis limits
-#' @param output_file Output file path
-#' @return ggplot object
-create_ma_plot <- function(res, alpha = 0.05, ylim = c(-8, 8), output_file = NULL) {
-  # Create plot
-  plt <- plotMA(res, alpha = alpha, ylim = ylim)
+plot_ma_from_res <- function(res_df, lfc_threshold = 1, alpha = 0.05, title = NULL, output_file = NULL) {
   
-  # Save if output file specified
-  if (!is.null(output_file)) {
-    tiff(output_file, width = 8, height = 6, units = "in", res = 300, bg = "white")
-    print(plt)
-    dev.off()
+  res_df <- res %>%
+    as.data.frame() %>%
+    mutate(color = case_when( 
+      padj < 0.05  ~ "padj < 0.05",   
+      pvalue < 0.05  ~ "pvalue < 0.05", 
+      TRUE ~ "All"
+    ))
+  
+  plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
+    geom_point(alpha = 0.7, size = 1) +
+    geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +
+    scale_color_manual(values = c("All" = "gray70", 
+                                  "pvalue < 0.05" = "blue", 
+                                  "padj < 0.05" = "red")) +
+    scale_x_log10(labels = scales::scientific) + 
+    theme_minimal() +
+    labs(x = "mean of normalized counts", 
+         y = "log fold change", 
+         color = NULL)
+
+  
+  if(!is.null(output_file)) {
+    ggsave(output_file, plt, width = 7, height = 5, dpi = 300)
   }
   
   return(plt)

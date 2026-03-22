@@ -12,318 +12,108 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{r}
-library(tidyverse)
-library(DESeq2)
-library(pheatmap)
-library(RColorBrewer)
-library(clusterProfiler)
-library(biomaRt)
-library(org.Hs.eg.db)
-library(EnhancedVolcano)
-library(GenomicRanges)
-library(msigdbr)
-library(multiMiR)
-library(miRBaseConverter)
-library(enrichplot)
-library(vsn)
-library(rvest)
-library(patchwork)
-library(dbplyr)
-library(GGally) 
-library(ggVennDiagram)
-library(Rtsne)
-```
-### Импортируем данные ###
+### Data importing ###
 
 ```{r}
-setwd("/Users/dariakilina/GitHub/ncRNA_pipeline")
-source("config.R")
-source("Transplantation/config_t.R")
-source("src/data_processing.R")
+source(here("config.R"))
+source(here("Transplantation", "config_t.R"))
+source(here("src", "data_processing.R"))
+source(here("src", "visualization.R"))
+source(here("src", "calculations.R"))
 data <- load_and_process_data()
 counts <- data$counts
 phenotable <- data$phenotable
-```
-```{r}
-setwd("/Users/dariakilina/GitHub/ncRNA_pipeline")
 summed_anno <- load_sample_annotation(phenotable = data$phenotable)
 ```
-**Диаграмма Венна: микроРНК с высокой экспрессией (>150 каунтов)**
+**Venn plot (>150 counts)**
+
 ```{r}
-counts_venn <- as.data.frame(t(counts)) %>%
-  rownames_to_column(var = "sample_count") 
-tmp <- left_join(counts_venn, coldata, by = c("sample_count" = "sample"))
-
-summed_venn <- tmp %>%
-  group_by(condition) %>%
-  summarise(across(where(is.numeric), sum)) %>%
-  pivot_longer(cols = -condition, names_to = "miRNA", values_to = "counts") %>%
-  filter(counts > 150) 
-
-venn_no_c <- summed_venn[summed_venn$condition == "no_complications", ]$miRNA 
-venn_cell <- summed_venn[summed_venn$condition == "cellular", ]$miRNA
-venn_hum <- summed_venn[summed_venn$condition == "humoral", ]$miRNA 
-venn_TCAD <- summed_venn[summed_venn$condition == "TCAD", ]$miRNA 
-
-venn_list <- list(
-  Non = venn_no_c,
-  Сellular = venn_cell,
-  Humoral = venn_hum,
-  TCAD = venn_TCAD
+venn_plot <- create_venn_diagram(
+  counts = data$counts,
+  phenotable = data$phenotable
 )
-
-plt <- ggVennDiagram(venn_list, label_alpha = 0) +
-  scale_fill_gradient(
-    low = "white",
-    high = "blue",
-    limits = c(1, 30),          # диапазон значений
-    oob = scales::squish        # значения вне диапазона "прижимаются" к границам
-  ) +
-  theme_minimal()
-
-print(plt)
-ggsave("./pictures_transpl/Venn Diagram with micro-RNA expression more than 150 counts.tiff", plot = plt, width = 8, height = 6, dpi = 300,  bg = "white")
+venn_plot$plot
 ```
-**Уникальные микроРНК для каждой группы**
+**Unique miRs**
 ```{r}
-unique_no_c <- setdiff(venn_no_c, c(venn_cell, venn_hum, venn_TCAD))
-unique_cell <- setdiff(venn_cell, c(venn_no_c, venn_hum, venn_TCAD))
-unique_hum <- setdiff(venn_hum, c(venn_no_c, venn_cell, venn_TCAD))
-unique_TCAD <- setdiff(venn_TCAD, c(venn_no_c, venn_cell, venn_hum))
-
-list(
-  no_complications = unique_no_c,
-  cellular = unique_cell,
-  humoral = unique_hum,
-  TCAD = unique_TCAD
-)
+get_unique_venn_elements(venn_plot$venn_list)
 ```
-**Весь датасет по семплам**
+**Barplots**
 ```{r}
-anno_long <- anno %>%
-  pivot_longer(cols = -Sample.name.s., names_to = "RNA_Type", values_to = "Count")
-
-plt <- ggplot(anno_long, aes(x = Sample.name.s., y = Count, fill = RNA_Type)) +
-  geom_bar(stat = "identity") +
-  theme_minimal() +
-  labs(x = "Sample", y = "Read Count") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_fill_brewer(palette = "Set3")  # Красивые цвета
-
-print(plt)
-ggsave("./pictures_transpl/transpl_barplot_alldataset_no_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300,  bg = "white")
+create_barplot_all_dataset(data = summed_anno)
 ```
-
 ```{r}
-anno_long <- anno %>%
-  rowwise() %>%
-  mutate(across(-Sample.name.s., ~ . / sum(c_across(-Sample.name.s.)))) %>% 
-  ungroup() %>%
-  pivot_longer(cols = -Sample.name.s., names_to = "RNA_Type", values_to = "Proportion")
-
-plt <- ggplot(anno_long, aes(x = Sample.name.s., y = Proportion, fill = RNA_Type)) +
-  geom_bar(stat = "identity") +
-  theme_minimal() +
-  labs(x = "Sample", y = "Proportion") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_fill_brewer(palette = "Set3")
-
-plt
-ggsave("./pictures_transpl/transpl_barplot_alldataset_normalised.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+create_barplot_all_dataset_normalized(data = summed_anno)
 ```
-**Весь датасет по группам**
 ```{r}
-# summed_anno_plt <- summed_anno %>%
-#   rowwise() %>%
-#   mutate(across(-condition, ~ . / sum(c_across(-condition)))) %>% 
-#   ungroup() %>%
-#   pivot_longer(cols = -condition, names_to = "RNA_Type", values_to = "Proportion")
-
-summed_anno_plt <- summed_anno %>%
-  pivot_longer(cols = -condition, names_to = "RNA_Type", values_to = "Count")
-
-plt <- ggplot(summed_anno_plt, aes(x = condition, y = Count, fill = RNA_Type)) +
-  geom_bar(stat = "identity") +
-  theme_minimal() +
-  labs(x = "Sample", y = "Proportion") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_fill_brewer(palette = "Set3")
-
-plt
-ggsave("./pictures_transpl/transpl_barplot_alldataset_normalised_by groups.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-```
-
-
-**Матрица для анализа дифференциальной экспрессии:**
-```{r}
-coldata$condition <- relevel(factor(coldata$condition), ref = "no_complications")
-modelMatrix <- model.matrix(~condition, coldata)
-modelMatrix
-qr(modelMatrix)$rank  # ранг матрицы
-ncol(modelMatrix) 
-```
-
-**Создание DESeqDataSet:**
-```{r}
-dds <- DESeqDataSetFromMatrix(countData = counts, colData = coldata, design = ~ condition)
-dds$condition <- relevel(dds$condition, ref = "no_complications")
-dds
-```
-**Фильтрация датасета:**
-```{r}
-dim(dds)
-smallestGroupSize <- 15
-keep <- rowSums(counts(dds) >= 10) >= smallestGroupSize
-dds <- dds[keep,]
-dim(dds)
+grouped_barplots <- create_grouped_barplots(data = summed_anno, phenotable = data$phenotable)
+grouped_barplots$counts
+#grouped_barplots$proportion
 ```
 ###  Run Differential Expression Analysis ###
 ```{r}
+dds <- create_dds(counts, coldata = phenotable, ref_level = "NR", condition_col = "condition", check_rank = TRUE)
 dds <- DESeq(dds, fitType = "parametric")
-dds
+dds 
 ```
+**transformation**
 
+• The plot should show a nearly horizontal line, meaning the SD is independent of the mean expression.
+• This means the transformation has successfully stabilized the variance, making the data more suitable for further analysis.
 ```{r}
-plotDispEsts(dds)
+rlt_list <- auto_transform_dds(dds)
+rlt <- rlt_list$transformed
+rlt_list
 ```
-**График нормализации каунтов**
-```{r}
-raw_counts <- counts(dds, normalized = FALSE)
-normalized_counts <- counts(dds, normalized = TRUE)
-
-df <- data.frame(
-  Sample = rep(colnames(dds), 2),
-  Counts = c(colSums(raw_counts), colSums(normalized_counts)),
-  Type = rep(c("Raw", "Normalized"), each = ncol(dds))
-)
-
-plt <- ggplot(df, aes(x = Sample, y = Counts, fill = Type)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  theme_minimal() +
-  labs(title = "Counts before and after normalization", x = "Sample", y = "Total Counts") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-plt
-ggsave("./pictures_transpl/transpl_Counts before and after normalization.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-```
-**rlog трансформация**
-
-- Позволяет стабилизировать дисперсию (разброс значений), особенно для генов с низким уровнем экспрессии.  
-- Преобразует данные в логарифмическую шкалу, но с регуляризацией, чтобы избежать сильного влияния малых значений. 
-
-	•	Ось X: среднее количество прочтений (reads).  
-	•	Ось Y: стандартное отклонение (разброс значений экспрессии).  
-
-	•	График должен показывать почти горизонтальную линию, то есть SD не зависит от среднего выражения.  
-	•	Это значит, что трансформация успешно стабилизировала дисперсию, что делает данные более пригодными для дальнейшего анализа.  
-```{r}
-rlt <- rlog(dds)  #rlog Transformation
-meanSdPlot(assay(rlt)) 
-
-```
-**rlog трансформация**
-```{r}
-vsd <- varianceStabilizingTransformation(dds, blind=FALSE) 
-meanSdPlot(assay(vsd)) #показывает, как изменяется стандартное отклонение в зависимости от среднего значения экспрессии
-```
-
 **PCA plot**
 ```{r}
-pcaData <- plotPCA(rlt, intgroup=c("condition"), returnData = TRUE)
-percentVar <- round(100 * attr(pcaData, "percentVar"))
-
-pcaData$sample <- gsub("_.*", "", coldata$sample)
-
-
-plt <- ggplot(pcaData, aes(PC1, PC2, color = condition)) +
-  geom_text(aes(label=sample), size=3, vjust=1.5) +
-  geom_point(size = 3) +
-  xlab(paste0("PC1: ", percentVar[1], "%")) +
-  ylab(paste0("PC2: ", percentVar[2], "%")) + 
-  coord_fixed() +
-  theme_bw() +
-  scale_color_brewer(palette = "Set2")
-plt
-ggsave("./pictures_transpl/transpl_PCA plot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-```
-**Попробовала сделать PCA c большим количеством компонент (но лучше не стало)**
-Хотя  PC2 vs PC4 их хотя бы вытащил из кучи
-
-Если боксплот для PC1 показывает, что одна группа имеет более широкий разброс значений, это значит, что эта группа более вариабельна по данной компоненте. Если боксплот очень узкий, значит, почти все образцы имеют схожие значения в этой компоненте.
-corr: коэффициент корреляции Пирсона между двумя главными компонентами 
-```{r}
-pcs_count <- 4  # Количество главных компонент
-pca_result <- prcomp(t(assay(rlt)), center = TRUE, scale. = TRUE)
-
-# Достаем объяснённую дисперсию
-explained_variance_ratio <- pca_result$sdev^2 / sum(pca_result$sdev^2)
-
-miRNA_pca_df <- as.data.frame(pca_result$x[, 1:pcs_count])
-colnames(miRNA_pca_df) <- paste0("PC", 1:pcs_count, " (", round(explained_variance_ratio[1:pcs_count] * 100, 2), "%)")
-
-miRNA_pca_df$Group <- paste(coldata$condition)
-
-plt <- ggpairs(
-  miRNA_pca_df, aes(color = Group, alpha = 0.7),
-  upper = list(continuous = wrap("cor", size = 3))
-)
-
-plt
-ggsave("./pictures_transpl/transpl_PCA plot 4 comp.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+create_pca_plot(rlt, condition_col = "condition")
 ```
 
-
-**Plot a heatmap of 50 most expressed genes**
-Этот heatmap отражает уровни экспрессии генов, а не разницу между группами.
-Цвета не означают up- или down-регуляцию в сравнении с контрольной группой, потому что heatmap показывает абсолютные значения экспрессии, а не fold change!
+**Plot a heatmap of most variable genes**
 ```{r}
-select <- order(rowMeans(counts(dds,normalized=TRUE)),
-                decreasing=TRUE)[1:50]
-df <- as.data.frame(colData(dds)$condition)
-colnames(df) <- "condition"
-rownames(df) <- colnames(counts(dds))
-plt <- pheatmap(assay(rlt)[select,], 
-         cluster_rows = TRUE, 
-         show_rownames = TRUE, 
-         cluster_cols = TRUE, 
-         annotation_col = df,
-         fontsize_row = 6) 
-
-plt
-ggsave("./pictures_transpl/transpl_Plot a heatmap of 50 most expressed genes.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+create_heatmap_most_expressed(rlt, top_n = 30, group_col = "condition", output_file = NULL)
 ```
 **Plot of the distance between samples heatmap**
-Расчет расстояний между образцами
-	•	Обычно используется евклидово расстояние (по умолчанию в DESeq2).
-	•	Оно вычисляется по нормализованным данным экспрессии (rlog() или vst()).
-	•	Чем меньше расстояние — тем более похожи образцы.
+
 ```{r}
-sampleDists <- dist(t(assay(rlt)))
-sampleDistMatrix <- as.matrix(sampleDists)
-rownames(sampleDistMatrix) <- paste(rlt$condition)
-colnames(sampleDistMatrix) <- paste(rlt$condition)
-colors <- colorRampPalette(rev(brewer.pal(9, "Blues")) )(255)
-
-plt <- pheatmap(sampleDistMatrix,
-         clustering_distance_rows = "euclidean",
-         clustering_distance_cols = "euclidean",
-         color = colors)
-
-plt
-ggsave("./pictures_transpl/transpl_Plot of the distance between samples heatmap.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+create_sample_distance_heatmap(rlt, group_col = "condition", output_file = NULL)
 ```
-## Гуморальное отторжение ##
-
-**Результаты анализа диф экспресии с контрастом "humoral" VS "no_complications"**
+## Results ##
 ```{r}
-res_humoral <- results(dds, contrast=c("condition", "humoral", "no_complications"))
+all_res <- list()
+all_sign_res <- list()
+for (name in names(CONTRASTS)) {
+  res <- get_significant_results(
+    dds = dds,
+    contrast = CONTRASTS[[name]],
+    output_res = file.path("results", paste0("results_", name, ".csv")),
+    output_sign_res = file.path("results", paste0("sign_results_", name, ".csv")),
+    alpha = 0.05, lfc_threshold = 1)
+  all_res[[name]] <- res$res_df         
+  all_sign_res[[name]] <- res$res_sign_df
+}
+
+all_sign_res$humoral
+all_sign_res$cellular
+all_sign_res$CAV
 ```
 **MA plot**
-Фильтрация точек с низким средним экспрессированием (по baseMean).
-	•	Обычно отсекаются baseMean < 1.
-	2.	Определение значимых генов (синие точки):
-	•	Используется критерий padj < 0.1 по умолчанию, а не < 0.05! 
+```{r}
+source(here("src", "visualization.R"))
+ma_plots <- list()
+for(name in names(all_res)) {
+  ma_plots[[name]] <- plot_ma_from_res(
+    res_df = all_res[[name]],
+    output_file = file.path("results", paste0("MAplot_", name, ".png"))
+  )
+}
+
+ma_plots$humoral
+ma_plots$cellular
+ma_plots$CAV
+```
+ 
 ```{r}
 tiff("./pictures_transpl/transpl_PlotMA_standart_padj_0.05_humoral.tiff", 
      width = 8, height = 6, units = "in", res = 300, bg = "white")

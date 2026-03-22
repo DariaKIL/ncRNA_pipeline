@@ -1,64 +1,101 @@
+# Get unique Venn RNA
 
-#' Create DESeqDataSet object
-#'
-#' @param counts Count matrix
-#' @param coldata Phenotype data
-#' @return DESeqDataSet object
-create_deseq_dataset <- function(counts, coldata) {
+get_unique_venn_elements <- function(venn_list) {
+  unique_list <- lapply(names(venn_list), function(g) {
+    others <- setdiff(names(venn_list), g)
+    setdiff(venn_list[[g]], unlist(venn_list[others]))
+  })
+  names(unique_list) <- names(venn_list)
+  return(unique_list)
+}
+
+
+# Create DESeqDataSet object
+
+create_dds <- function(counts, coldata, condition_col,
+                       ref_level, check_rank = FALSE) {
+  
+  # Convert column name to formula
+  design_formula <- as.formula(paste("~", condition_col))
+  
   # Create DESeqDataSet
-  dds <- DESeqDataSetFromMatrix(countData = counts, colData = coldata, design = ~ condition)
-  dds$condition <- relevel(dds$condition, ref = "NR")
+  dds <- DESeqDataSetFromMatrix(
+    countData = counts,
+    colData = coldata,
+    design = design_formula
+  )
+  
+  # Set reference level
+  dds[[condition_col]] <- relevel(dds[[condition_col]], ref = ref_level)
+  
+  # Optional: check model matrix rank
+  if (check_rank) {
+    modelMatrix <- model.matrix(design_formula, coldata)
+    cat("Rank of model matrix:", qr(modelMatrix)$rank, "\n")
+    cat("Number of columns:", ncol(modelMatrix), "\n")
+  }
   
   return(dds)
 }
 
-#' Filter dataset
-#'
-#' @param dds DESeqDataSet object
-#' @param min_count Minimum count threshold
-#' @param min_samples Minimum samples threshold
-#' @return Filtered DESeqDataSet object
-filter_dataset <- function(dds, min_count = 10, min_samples = 15) {
-  # Filter based on minimum count and samples
-  keep <- rowSums(counts(dds) >= min_count) >= min_samples
-  dds <- dds[keep,]
+# Transformation of dds
+auto_transform_dds <- function(dds, blind = FALSE, plot = TRUE) {
   
-  return(dds)
+  n_samples <- ncol(dds)
+  n_genes <- nrow(dds)
+  
+  cat("Samples:", n_samples, "\n")
+  cat("Genes:", n_genes, "\n")
+  
+  # Choose transformation
+  if (n_samples > 30) {
+    cat("Using variance stabilizing transformation (vst)\n")
+    transformed <- varianceStabilizingTransformation(dds, blind = blind)
+    method <- "vst"
+  } else {
+    cat("Using rlog transformation\n")
+    transformed <- rlog(dds, blind = blind)
+    method <- "rlog"
+  }
+  
+  # Optional mean-SD plot
+  if (plot) {
+    vsn::meanSdPlot(assay(transformed))
+  }
+  
+  return(list(
+    transformed = transformed,
+    method = method
+  ))
 }
 
-#' Run differential expression analysis
-#'
-#' @param dds DESeqDataSet object
-#' @return DESeqDataSet object with results
-run_differential_expression <- function(dds) {
-  # Run DESeq analysis
-  dds <- DESeq(dds, fitType = "parametric")
-  
-  return(dds)
-}
 
-#' Get results for specific contrast
-#'
-#' @param dds DESeqDataSet object
-#' @param contrast Contrast specification
-#' @return DESeq2 results object
-get_contrast_results <- function(dds, contrast) {
-  # Get results for specified contrast
-  res <- results(dds, contrast = contrast)
-  
-  return(res)
-}
+# Get significant results
 
-#' Get significant results
-#'
-#' @param res DESeq2 results object
-#' @param alpha Significance threshold
-#' @return Data frame with significant results
-get_significant_results <- function(res, alpha = 0.05) {
-  # Get significant results
-  signres <- results(dds, contrast = contrast, alpha = alpha)
+get_significant_results <- function(dds, contrast, output_res = NULL, output_sign_res = NULL, alpha = 0.05, lfc_threshold = 1) {
   
-  return(signres)
+  # Get DESeq2 results
+  res <- results(dds, contrast = contrast, alpha = alpha)
+  
+  # Filter significant genes
+  res_sign_df <- as.data.frame(subset(res, padj < alpha & !is.na(padj) & abs(log2FoldChange) > lfc_threshold))
+  res_df <- as.data.frame(res)
+  
+  # Save if output_file specified
+  if (!is.null(output_res)) {
+    write.csv(res_df, file = output_res, row.names = TRUE)
+    cat("Significant results saved to:", output_res, "\n")
+  }
+  
+  if (!is.null(output_sign_res)) {
+    write.csv(res_sign_df, file = output_sign_res, row.names = TRUE)
+    cat("Significant results saved to:", output_sign_res, "\n")
+  }
+  
+  return(list(
+    res_df = res_df,
+    res_sign_df = res_sign_df
+  ))
 }
 
 #' Get sorted results
@@ -72,24 +109,6 @@ get_sorted_results <- function(res) {
   return(res_sorted)
 }
 
-#' Get unique miRNAs for each group
-#'
-#' @param venn_list List of miRNAs for each group
-#' @return List of unique miRNAs for each group
-get_unique_miRNAs <- function(venn_list) {
-  # Get unique miRNAs for each group
-  unique_no_c <- setdiff(venn_list$Non, c(venn_list$Сellular, venn_list$AMR, venn_list$CAV))
-  unique_cell <- setdiff(venn_list$Сellular, c(venn_list$Non, venn_list$AMR, venn_list$CAV))
-  unique_hum <- setdiff(venn_list$AMR, c(venn_list$Non, venn_list$Сellular, venn_list$CAV))
-  unique_CAV <- setdiff(venn_list$CAV, c(venn_list$Non, venn_list$Сellular, venn_list$AMR))
-  
-  return(list(
-    NR = unique_no_c,
-    ACR = unique_cell,
-    AMR = unique_hum,
-    CAV = unique_CAV
-  ))
-}
 
 #' Convert miRNA versions
 #'

@@ -9,10 +9,7 @@ load_and_process_data <- function() {
   
   cat("Loading phenotable data...\n")
   cat("   File:", PHENOTYPE_FILE, "\n")
-  
-  if (!file.exists(PHENOTYPE_FILE)) {
-    stop("❌ Phenotype file not found: ", PHENOTYPE_FILE)
-  }
+
   
   phenotable <- read.delim(
     PHENOTYPE_FILE,

@@ -1,9 +1,9 @@
 # config.R
 
-COUNTS_MIR_FILE <- file.path("data/raw/miR.Counts.csv")
-COUNTS_TRF_FILE <- file.path("data/raw/tRF.Counts.csv")
-ANNOTATION_FILE <- file.path("data/raw/annotation.report.csv")
 
+COUNTS_MIR_FILE <- here("data", "raw", "miR.Counts.csv")
+COUNTS_TRF_FILE <- here("data", "raw", "tRF.Counts.csv")
+ANNOTATION_FILE <- here("data", "raw", "annotation.report.csv")
 
 # FILTERING PARAMETERS
 # Minimum expression level
@@ -15,19 +15,6 @@ LOG2FC_THRESHOLD <- 1.0
 
 # Threshold for "high" expression (for Venn diagram)
 HIGH_EXPRESSION_THRESHOLD <- 150
-
-# NORMALIZATION PARAMETERS
-
-# Transformation method: "rlog" or "vst"
-TRANSFORM_METHOD <- "rlog"
-
-# VISUALIZATION PARAMETERS
-
-# Number of top genes for heatmap
-TOP_GENES_HEATMAP <- 50
-
-# Base text size for plots
-BASE_TEXT_SIZE <- 12
 
 
 # ENRICHMENT ANALYSIS PARAMETERS
@@ -49,7 +36,9 @@ required_packages <- c(
   "DESeq2", "ggplot2", "pheatmap", "RColorBrewer", 
   "vsn", "hexbin", "tidyverse", "ggrepel", 
   "EnhancedVolcano", "ggvenn", "clusterProfiler",
-  "org.Hs.eg.db", "multiMiR", "miRBaseConverter"
+  "org.Hs.eg.db", "multiMiR", "miRBaseConverter", "here", 
+  "dplyr", "tidyr", "biomaRt", "GenomicRanges", "msigdbr",
+  "enrichplot", "Rtsne", "GGally", "rvest", "patchwork"
 )
 
 # Function to install missing packages
