@@ -15,18 +15,6 @@ This repository contains analysis workflows and exploratory data analysis for se
 - extracellular vesicles from cardiovascular samples
 - heart transplant recipient cohorts
 - pancreas cyst-derived biological material
-	
-### 📊 Visualization
-
-- [MicroRNA in Vesicles](https://DariaKIL.github.io/ncRNA_pipeline/Vesicles_CABG/microRNA_vesicles.nb.html)
-
-- [tRNA in Vesicles](https://DariaKIL.github.io/ncRNA_pipeline/Vesicles_CABG/tRNA_vesicles.nb.html) 
-
-- [MicroRNA in Heart Transplants](https://DariaKIL.github.io/ncRNA_pipeline/Transplantation/microRNA_transplant_all.nb.html)  
-
-- [tRNA in Heart Transplants](https://DariaKIL.github.io/ncRNA_pipeline/Transplantation/tRNA_transplant.nb.html)  
-
-- [ncRNA (micro-RNA and tRNA) from cysts materials](https://DariaKIL.github.io/ncRNA_pipeline/Cysts/ncRNA_cysts.nb.html)  
 
 **Repository structure (planned)**
 ```
@@ -35,12 +23,11 @@ ncRNA_pipeline/
 ├── .gitignore
 ├── .gitattributes
 ├── .DS_Store
-├── config/
-│   └── config.R
+├── config.R
 ├── data/
 │   └── raw/
 │       ├── miR.Counts.csv
-│       ├── tRNA.Counts.csv
+│       ├── tRF.Counts.csv
 │       └── annotation.report.csv
 ├── src/
 │   ├── data_processing.R
@@ -52,7 +39,7 @@ ncRNA_pipeline/
 │   └── calculations.R
 └── projects/
     ├── Transplantation/
-    │   ├── config.R
+    │   ├── config_t.R
     │   ├── data/
     │   │   ├── phenotable.tsv
     │   │   └── Cytokines.csv
@@ -63,14 +50,14 @@ ncRNA_pipeline/
     │   │   └── Transplantation_WGCNA.nb.html
     │   └── figures/
     ├── Cysts_pancreas/
-    │   ├── config.R
+    │   ├── config_c.R
     │   ├── data/phenotable.tsv
     │   ├── Cysts_analysis.Rmd
     │   ├── reports/
     │   │   └── Cysts_analysis.nb.html
     │   └── figures/
     └── Vesicles_CABG/
-        ├── config.R
+        ├── config_v.R
         ├── data/phenotable.tsv
         ├── Vesicles_analysis.Rmd
         ├── reports/
