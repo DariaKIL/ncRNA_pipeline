@@ -30,22 +30,47 @@ This repository contains analysis workflows and exploratory data analysis for se
 
 **Repository structure (planned)**
 ```
-ncRNA_pipeline
-│
-├── configs/
-│   ├── vesicles.yaml
-│   ├── transplant.yaml
-│   └── cysts.yaml
-│
+ncRNA_pipeline/
+├── README.md
+├── .gitignore
+├── config/
+│   └── config.R
+├── data/
+│   └── raw/
+│       ├── miR.Counts.csv
+│       ├── tRNA.Counts.csv
+│       ├── Cytokines.csv
+│       └── annotation.report.csv
 ├── src/
-│   ├── analysis_functions.R
-│   └── plotting_functions.R
-│
-├── reports/
-│   ├── Vesicles_CABG/
-│   ├── Transplantation/
-│   └── Cysts/
-│
-├── results/
-└── README.md
+│   ├── data_processing.R
+│   ├── deseq_analysis.R
+│   ├── enrichment.R
+│   ├── visualization.R
+│   ├── generate_figures.R
+│   ├── wgcna_analysis.R
+│   └── calculations.R
+└── projects/
+    ├── Transplantation/
+    │   ├── config.R
+    │   ├── data/phenotable.tsv
+    │   ├── Transplantation_analysis.Rmd
+    │   ├── Transplantation_WGCNA.Rmd
+    │   ├── reports/
+    │   │   ├── Transplantation_analysis.html
+    │   │   └── Transplantation_WGCNA.html
+    │   └── figures/
+    ├── Cysts_pancreas/
+    │   ├── config.R
+    │   ├── data/phenotable.tsv
+    │   ├── Cysts_analysis.Rmd
+    │   ├── reports/
+    │   │   └── Cysts_analysis.html
+    │   └── figures/
+    └── Vesicles_CABG/
+        ├── config.R
+        ├── data/phenotable.tsv
+        ├── Vesicles_analysis.Rmd
+        ├── reports/
+        │   └── Vesicles_analysis.html
+        └── figures/
 ``` 
