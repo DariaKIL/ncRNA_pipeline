@@ -33,13 +33,14 @@ This repository contains analysis workflows and exploratory data analysis for se
 ncRNA_pipeline/
 ├── README.md
 ├── .gitignore
+├── .gitattributes
+├── .DS_Store
 ├── config/
 │   └── config.R
 ├── data/
 │   └── raw/
 │       ├── miR.Counts.csv
 │       ├── tRNA.Counts.csv
-│       ├── Cytokines.csv
 │       └── annotation.report.csv
 ├── src/
 │   ├── data_processing.R
@@ -52,25 +53,27 @@ ncRNA_pipeline/
 └── projects/
     ├── Transplantation/
     │   ├── config.R
-    │   ├── data/phenotable.tsv
+    │   ├── data/
+    │   │   ├── phenotable.tsv
+    │   │   └── Cytokines.csv
     │   ├── Transplantation_analysis.Rmd
     │   ├── Transplantation_WGCNA.Rmd
     │   ├── reports/
-    │   │   ├── Transplantation_analysis.html
-    │   │   └── Transplantation_WGCNA.html
+    │   │   ├── Transplantation_analysis.nb.html
+    │   │   └── Transplantation_WGCNA.nb.html
     │   └── figures/
     ├── Cysts_pancreas/
     │   ├── config.R
     │   ├── data/phenotable.tsv
     │   ├── Cysts_analysis.Rmd
     │   ├── reports/
-    │   │   └── Cysts_analysis.html
+    │   │   └── Cysts_analysis.nb.html
     │   └── figures/
     └── Vesicles_CABG/
         ├── config.R
         ├── data/phenotable.tsv
         ├── Vesicles_analysis.Rmd
         ├── reports/
-        │   └── Vesicles_analysis.html
+        │   └── Vesicles_analysis.nb.html
         └── figures/
 ``` 
