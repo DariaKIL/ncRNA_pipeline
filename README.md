@@ -16,7 +16,7 @@ This repository contains analysis workflows and exploratory data analysis for se
 - heart transplant recipient cohorts
 - pancreas cyst-derived biological material
 
-Data visualization transplantations[https://dariakil.github.io/ncRNA_pipeline/Transplantation/Transplantation_analysis.nb.html]
+[Data visualization transplantations](https://dariakil.github.io/ncRNA_pipeline/Transplantation/Transplantation_analysis.nb.html)
 
 **Repository structure (planned)**
 ```
