@@ -2,15 +2,10 @@
 
 DATA_DIR <- "data"
 
-PHENOTYPE_FILE <- file.path(DATA_DIR, "phenotable.tsv")
-COUNTS_FILE <- file.path(DATA_DIR, "miR.Counts.csv")
+COUNTS_MIR_FILE <- file.path(DATA_DIR, "/raw/miR.Counts.csv")
+COUNTS_TRF_FILE <- file.path(DATA_DIR, "/raw/tRF.Counts.csv")
+ANNOTATION_FILE <- file.path(DATA_DIR, "/raw/annotation.report.csv")
 
-OUTPUT_DIR <- "results"
-FIGURES_DIR <- "figures"
-
-# Create directories if they do not exist
-dir.create(OUTPUT_DIR, showWarnings = FALSE)
-dir.create(FIGURES_DIR, showWarnings = FALSE)
 
 # FILTERING PARAMETERS
 # Minimum expression level
@@ -36,13 +31,6 @@ TOP_GENES_HEATMAP <- 50
 # Base text size for plots
 BASE_TEXT_SIZE <- 12
 
-# Color palette for groups
-GROUP_COLORS <- c(
-  "no_complications" = "#4DAF4A",
-  "humoral" = "#E41A1C",
-  "cellular" = "#377EB8",
-  "TCAD" = "#FF7F00"
-)
 
 # ENRICHMENT ANALYSIS PARAMETERS
 
@@ -55,13 +43,6 @@ MIN_GENESET_SIZE <- 10
 # Maximum gene set size
 MAX_GENESET_SIZE <- 500
 
-
-CONTRASTS <- list(
-  humoral = c("condition", "AMR", "NR"),
-  cellular = c("condition", "ACR", "NR"),
-  TCAD = c("condition", "CAV", "NR")
-)
-
 set.seed(42)
 
 # REQUIRED LIBRARIES
@@ -69,8 +50,8 @@ set.seed(42)
 required_packages <- c(
   "DESeq2", "ggplot2", "pheatmap", "RColorBrewer", 
   "vsn", "hexbin", "tidyverse", "ggrepel", 
-  "EnhancedVolcano", "VennDiagram", "clusterProfiler",
-  "org.Hs.eg.db", "multiMiR", "miRBaseConverter", "ggVennDiagram"
+  "EnhancedVolcano", "ggvenn", "clusterProfiler",
+  "org.Hs.eg.db", "multiMiR", "miRBaseConverter"
 )
 
 # Function to install missing packages

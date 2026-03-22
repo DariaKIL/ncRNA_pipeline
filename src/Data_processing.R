@@ -30,15 +30,15 @@ load_and_process_data <- function() {
               paste(names(table(phenotable$condition)), collapse = ", ")))
   
   cat("\n Loading counts data...\n")
-  cat("   File:", COUNTS_FILE, "\n")
+  cat("   File:", COUNTS_MIR_FILE, "\n")
   
-  if (!file.exists(COUNTS_FILE)) {
-    stop("❌ Counts file not found: ", COUNTS_FILE)
+  if (!file.exists(COUNTS_MIR_FILE)) {
+    stop("❌ Counts file not found: ", COUNTS_MIR_FILE)
   }
   
   # Load counts
   counts <- read.table(
-    COUNTS_FILE,
+    COUNTS_MIR_FILE,
     header = TRUE,
     sep = ",",
     row.names = 1,
@@ -162,35 +162,61 @@ load_and_process_data <- function() {
   ))
 }
 
-
-#' Annotate RNA types based on feature names
+#' Load and align sample annotation
 #'
-#' @param counts Matrix or data.frame with features as rows
-#' @return Vector of RNA types
-annotate_rna_types <- function(counts) {
+#' @param annotation_file Path to annotation.report.csv
+#' @param phenotable Sample phenotype table
+#' @return Annotation table aligned with phenotable
+load_sample_annotation <- function(annotation_file, phenotable) {
   
-  cat("🏷️  Annotating RNA types...\n")
+  cat("📋 Loading sample annotation...\n")
+  cat("   File:", annotation_file, "\n")
   
-  types <- case_when(
-    grepl("^hsa-miR", rownames(counts)) ~ "miRNA",
-    grepl("^hsa-let", rownames(counts)) ~ "let-7",
-    grepl("piR", rownames(counts), ignore.case = TRUE) ~ "piRNA",
-    grepl("snoRNA", rownames(counts), ignore.case = TRUE) ~ "snoRNA",
-    grepl("tRNA", rownames(counts), ignore.case = TRUE) ~ "tRNA",
-    grepl("rRNA", rownames(counts), ignore.case = TRUE) ~ "rRNA",
-    grepl("snRNA", rownames(counts), ignore.case = TRUE) ~ "snRNA",
-    grepl("misc_RNA", rownames(counts), ignore.case = TRUE) ~ "misc_RNA",
-    grepl("Y_RNA", rownames(counts), ignore.case = TRUE) ~ "Y_RNA",
-    TRUE ~ "other"
-  )
-  
-  cat("   ✓ Annotation complete:\n")
-  type_counts <- table(types)
-  for (t in names(type_counts)) {
-    cat(sprintf("      %s: %d\n", t, type_counts[t]))
+  if (!file.exists(annotation_file)) {
+    stop("❌ Annotation file not found: ", annotation_file)
   }
   
-  return(types)
+  anno <- read.csv(annotation_file, header = TRUE)
+  
+  cat(sprintf("   ✓ Loaded %d samples × %d columns\n", nrow(anno), ncol(anno)))
+  
+  # Rename sample column for consistency
+  colnames(anno)[colnames(anno) == "Sample.name.s."] <- "sample"
+  
+  # Remove unnecessary columns
+  anno <- anno[, -c(2:5, 7, 15)]
+  
+  cat(sprintf("   ✓ Retained %d columns after filtering\n", ncol(anno)))
+  
+  cat("\n🔗 Matching annotation with phenotype...\n")
+  
+  # Clean sample names
+  anno$sample <- trimws(anno$sample)
+  phenotable$sample <- trimws(phenotable$sample)
+  
+  common_samples <- intersect(anno$sample, phenotable$sample)
+  
+  cat(sprintf("   Annotation samples: %d\n", nrow(anno)))
+  cat(sprintf("   Phenotype samples:  %d\n", nrow(phenotable)))
+  cat(sprintf("   Common samples:     %d\n", length(common_samples)))
+  
+  if (length(common_samples) == 0) {
+    stop("❌ No matching samples between annotation and phenotype")
+  }
+  
+  # Filter annotation
+  anno <- anno[anno$sample %in% common_samples, ]
+  
+  # Reorder to match phenotable
+  anno <- anno[match(phenotable$sample, anno$sample), ]
+  
+  # Verify order
+  if (!all(phenotable$sample == anno$sample)) {
+    stop("❌ Sample order mismatch after annotation alignment")
+  }
+  
+  cat("   ✓ Annotation successfully aligned\n\n")
+  
+  return(anno)
 }
-
 
