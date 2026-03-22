@@ -22,7 +22,6 @@ ncRNA_pipeline/
 ├── README.md
 ├── .gitignore
 ├── .gitattributes
-├── .DS_Store
 ├── config.R
 ├── data/
 │   └── raw/
@@ -37,30 +36,29 @@ ncRNA_pipeline/
 │   ├── generate_figures.R
 │   ├── wgcna_analysis.R
 │   └── calculations.R
-└── projects/
-    ├── Transplantation/
-    │   ├── config_t.R
-    │   ├── data/
-    │   │   ├── phenotable.tsv
-    │   │   └── Cytokines.csv
-    │   ├── Transplantation_analysis.Rmd
-    │   ├── Transplantation_WGCNA.Rmd
-    │   ├── reports/
-    │   │   ├── Transplantation_analysis.nb.html
-    │   │   └── Transplantation_WGCNA.nb.html
-    │   └── figures/
-    ├── Cysts_pancreas/
-    │   ├── config_c.R
-    │   ├── data/phenotable.tsv
-    │   ├── Cysts_analysis.Rmd
-    │   ├── reports/
-    │   │   └── Cysts_analysis.nb.html
-    │   └── figures/
-    └── Vesicles_CABG/
-        ├── config_v.R
-        ├── data/phenotable.tsv
-        ├── Vesicles_analysis.Rmd
-        ├── reports/
-        │   └── Vesicles_analysis.nb.html
-        └── figures/
+├── Transplantation/
+│   ├── config_t.R
+│   ├── data/
+│   │   ├── phenotable.tsv
+│   │   └── Cytokines.csv
+│   ├── Transplantation_analysis.Rmd
+│   ├── Transplantation_WGCNA.Rmd
+│   ├── reports/
+│   │   ├── Transplantation_analysis.nb.html
+│   │   └── Transplantation_WGCNA.nb.html
+│   └── figures/
+├── Cysts_pancreas/
+│   ├── config_c.R
+│   ├── data/phenotable.tsv
+│   ├── Cysts_analysis.Rmd
+│   ├── reports/
+│   │   └── Cysts_analysis.nb.html
+│   └── figures/
+└── Vesicles_CABG/
+    ├── config_v.R
+    ├── data/phenotable.tsv
+    ├── Vesicles_analysis.Rmd
+    ├── reports/
+    │   └── Vesicles_analysis.nb.html
+    └── figures/
 ``` 
