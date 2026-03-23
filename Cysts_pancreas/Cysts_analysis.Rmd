@@ -14,27 +14,6 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{r}
-library(tidyverse)
-library(DESeq2)
-library(pheatmap)
-library(RColorBrewer)
-library(clusterProfiler)
-library(biomaRt)
-library(org.Hs.eg.db)
-library(EnhancedVolcano)
-library(GenomicRanges)
-library(msigdbr)
-library(multiMiR)
-library(miRBaseConverter)
-library(enrichplot)
-library(vsn)
-library(rvest)
-library(patchwork)
-library(dbplyr)
-library(GGally) 
-library(ggVennDiagram)
-```
 ### Импортируем данные ###
 **Таблица фенотипов:**
 ```{r}

@@ -279,29 +279,38 @@ create_sample_distance_heatmap <- function(rlt, group_col = "condition", output_
 }
 
 #' Create MA plot
-plot_ma_from_res <- function(res_df, lfc_threshold = 1, alpha = 0.05, title = NULL, output_file = NULL) {
+plot_ma_from_res <- function(res_df, contrast_name = NULL, lfc_threshold = 1, alpha = 0.05, output_file = NULL) {
   
-  res_df <- res %>%
-    as.data.frame() %>%
-    mutate(color = case_when( 
-      padj < 0.05  ~ "padj < 0.05",   
-      pvalue < 0.05  ~ "pvalue < 0.05", 
-      TRUE ~ "All"
-    ))
+  # Set plot title based on contrast name
+  plot_title <- ifelse(!is.null(contrast_name), paste0("MA plot: ", contrast_name), "MA plot")
   
-  plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
-    geom_point(alpha = 0.7, size = 1) +
-    geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +
-    scale_color_manual(values = c("All" = "gray70", 
-                                  "pvalue < 0.05" = "blue", 
-                                  "padj < 0.05" = "red")) +
-    scale_x_log10(labels = scales::scientific) + 
-    theme_minimal() +
-    labs(x = "mean of normalized counts", 
-         y = "log fold change", 
-         color = NULL)
-
+  # Filter out genes with baseMean <= 0
+  res_df <- res_df[res_df$baseMean > 0, ]
   
+  # Determine significance
+  res_df$significance <- "not_significant"
+  res_df$significance[!is.na(res_df$pvalue) &
+                        res_df$pvalue < alpha &
+                        abs(res_df$log2FoldChange) > lfc_threshold] <- "pvalue"
+  res_df$significance[!is.na(res_df$padj) &
+                        res_df$padj < alpha &
+                        abs(res_df$log2FoldChange) > lfc_threshold] <- "padj"
+  
+  # Create plot
+  plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = significance)) +
+    geom_point(alpha = 0.6, size = 1) +
+    scale_x_log10() +
+    scale_color_manual(values = c(
+      "not_significant" = "gray70",
+      "pvalue" = "blue",
+      "padj" = "red"
+    )) +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    geom_hline(yintercept = c(-lfc_threshold, lfc_threshold), linetype = "dotted") +
+    labs(title = plot_title) +   
+    theme_bw()
+  
+  # Save plot if requested
   if(!is.null(output_file)) {
     ggsave(output_file, plt, width = 7, height = 5, dpi = 300)
   }
@@ -309,52 +318,16 @@ plot_ma_from_res <- function(res_df, lfc_threshold = 1, alpha = 0.05, title = NU
   return(plt)
 }
 
-#' Create custom MA plot
-#'
-#' @param res DESeq2 results object
-#' @param output_file Output file path
-#' @return ggplot object
-create_custom_ma_plot <- function(res, output_file = NULL) {
-  # Convert to data frame
-  res_df <- res %>%
-    as.data.frame() %>%
-    mutate(color = case_when( 
-      padj < 0.05  ~ "padj < 0.05",   
-      pvalue < 0.05  ~ "pvalue < 0.05", 
-      TRUE ~ "All"
-    ))
-  
-  # Create plot
-  plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
-    geom_point(alpha = 0.7, size = 1) +
-    geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +
-    scale_color_manual(values = c("All" = "gray70", 
-                                  "pvalue < 0.05" = "blue", 
-                                  "padj < 0.05" = "red")) +
-    scale_x_log10(labels = scales::scientific) + 
-    theme_minimal() +
-    labs(x = "mean of normalized counts", 
-         y = "log fold change", 
-         color = NULL)
-  
-  # Save if output file specified
-  if (!is.null(output_file)) {
-    ggsave(output_file, plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-  }
-  
-  return(plt)
-}
-
 #' Create volcano plot
-#'
-#' @param res DESeq2 results object
-#' @param output_file Output file path
-#' @return EnhancedVolcano object
-create_volcano_plot <- function(res, output_file = NULL) {
-  # Create plot
+
+create_volcano_plot <- function(res_df, res_sign_df, contrast_name = NULL, output_file = NULL) {
+  
+  # Если контраст указан, используем его как заголовок
+  plot_title <- ifelse(!is.null(contrast_name), paste0("Volcano plot: ", contrast_name), NULL)
+  
   plt <- EnhancedVolcano(
-    res,
-    lab = rownames(res),
+    res_df,
+    lab = rownames(res_df),
     x = 'log2FoldChange',
     y = 'padj',
     pCutoff = 0.05,
@@ -363,12 +336,11 @@ create_volcano_plot <- function(res, output_file = NULL) {
     boxedLabels = FALSE,
     col = c('black', '#CBD5E8', '#B3E2CD', 'red'),
     colAlpha = 1,
-    title = NULL,
-    selectLab = rownames(subset(res, padj < 0.05 & !is.na(padj) & abs(log2FoldChange) > 1.0)),  # all labels will be displayed
-    drawConnectors = TRUE               # arrows if labels overlap
+    title = plot_title,
+    selectLab = rownames(res_sign_df),
+    drawConnectors = TRUE
   )
   
-  # Save if output file specified
   if (!is.null(output_file)) {
     ggsave(output_file, plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
   }
@@ -377,11 +349,7 @@ create_volcano_plot <- function(res, output_file = NULL) {
 }
 
 #' Create boxplot for specific gene
-#'
-#' @param dds DESeqDataSet object
-#' @param gene Gene name or index
-#' @param output_file Output file path
-#' @return ggplot object
+
 create_gene_boxplot <- function(dds, gene, output_file = NULL) {
   # Get gene index if gene name provided
   if (is.character(gene)) {
@@ -414,47 +382,64 @@ create_gene_boxplot <- function(dds, gene, output_file = NULL) {
 }
 
 #' Create heatmap of differentially expressed genes
-#'
-#' @param res DESeq2 results object
-#' @param rlt rlog transformed data
-#' @param coldata Phenotype data
-#' @param output_file Output file path
-#' @return pheatmap object
-create_heatmap_diff_expressed <- function(res, rlt, coldata, output_file = NULL) {
-  # Filter significant genes
-  res_sign <- subset(res, padj < 0.05 & !is.na(padj) & abs(log2FoldChange) > 1.0)
-  res_sign <- res_sign[order(res_sign$log2FoldChange, decreasing = TRUE), ]
-  sig_genes <- rownames(res_sign)  
+
+create_heatmap_diff_expressed <- function(res_sign_df, rlt, coldata, condition_col = "condition",
+                                          conditions = NULL, output_file = NULL, scale_rows = TRUE) {
+  
+  # Check if there are enough significant genes
+  if (is.null(res_sign_df) || nrow(res_sign_df) < 2) {
+    message("No significant genes to plot for this contrast. Skipping...")
+    return(NULL)
+  }
   
   # Get expression matrix for significant genes
-  de_mat <- assay(rlt)[sig_genes, ] 
+  de_mat <- assay(rlt)[rownames(res_sign_df), , drop = FALSE]
   
-  # Filter samples for specific conditions
-  coldata_filtered <- coldata[coldata$condition %in% c("humoral", "no_complications"), ]
-  de_mat_filtered <- de_mat[, coldata_filtered$sample]
-  datamatrix <- t(scale(t(de_mat_filtered)))
+  # Filter samples by selected conditions (or use all if NULL)
+  if (!is.null(conditions)) {
+    coldata_filtered <- coldata[coldata[[condition_col]] %in% conditions, , drop = FALSE]
+  } else {
+    coldata_filtered <- coldata
+  }
   
-  # Create annotation data
-  annotation_col <- data.frame(condition = coldata_filtered$condition)
-  rownames(annotation_col) <- colnames(datamatrix)
+  # Keep only samples that exist in the expression matrix
+  coldata_filtered <- coldata_filtered[coldata_filtered$sample %in% colnames(de_mat), , drop = FALSE]
   
-  # Create annotation colors
-  annotation_colors <- list(
-    condition = c("no_complications" = "#FFCC00", "humoral" = "#3399FF"))
+  # Drop NA in condition column
+  coldata_filtered <- coldata_filtered[!is.na(coldata_filtered[[condition_col]]), , drop = FALSE]
+  
+  # Subset expression matrix
+  de_mat_filtered <- de_mat[, coldata_filtered$sample, drop = FALSE]
+  
+  if (ncol(de_mat_filtered) < 2) {
+    message("Not enough samples to plot heatmap. Skipping...")
+    return(NULL)
+  }
+  
+  # Scale by row if requested
+  datamatrix <- if(scale_rows) t(scale(t(de_mat_filtered))) else de_mat_filtered
+  
+  # Create annotation dataframe for columns with nice sample names
+  annotation_col <- data.frame(condition = coldata_filtered[[condition_col]])
+  rownames(annotation_col) <- paste0(gsub("_.*", "", coldata_filtered$sample), "_", coldata_filtered[[condition_col]])
+  colnames(datamatrix) <- rownames(annotation_col)
+  
+  # Only pick colors for levels present in filtered data
+  cond_levels <- unique(annotation_col$condition)
+  palette_colors <- RColorBrewer::brewer.pal(min(8, length(cond_levels)), "Set2")
+  annotation_colors <- list(condition = setNames(palette_colors, cond_levels))
   
   # Create heatmap
   plt <- pheatmap(datamatrix,
-           cluster_rows = TRUE, 
-           show_rownames = TRUE, 
-           cluster_cols = TRUE, 
-           annotation_col = annotation_col,
-           annotation_colors = annotation_colors,
-           display_numbers = FALSE,
-           legend = TRUE,
-           fontsize = 15)  
+                  cluster_rows = TRUE,
+                  cluster_cols = TRUE,
+                  show_rownames = TRUE,
+                  annotation_col = annotation_col,
+                  annotation_colors = annotation_colors,
+                  fontsize = 12)
   
-  # Save if output file specified
-  if (!is.null(output_file)) {
+  # Save plot if needed
+  if(!is.null(output_file)) {
     ggsave(output_file, plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
   }
   

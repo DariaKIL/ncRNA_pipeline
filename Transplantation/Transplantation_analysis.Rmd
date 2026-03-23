@@ -100,12 +100,13 @@ all_sign_res$CAV
 ```
 **MA plot**
 ```{r}
-source(here("src", "visualization.R"))
 ma_plots <- list()
 for(name in names(all_res)) {
   ma_plots[[name]] <- plot_ma_from_res(
-    res_df = all_res[[name]],
-    output_file = file.path("results", paste0("MAplot_", name, ".png"))
+    res_df = all_res[[name]], 
+    alpha = 0.05, 
+    contrast_name = name,
+    output_file = file.path("figures", paste0("ma_plot_", name, ".png"))
   )
 }
 
@@ -113,150 +114,45 @@ ma_plots$humoral
 ma_plots$cellular
 ma_plots$CAV
 ```
- 
-```{r}
-tiff("./pictures_transpl/transpl_PlotMA_standart_padj_0.05_humoral.tiff", 
-     width = 8, height = 6, units = "in", res = 300, bg = "white")
-plotMA(res_humoral, alpha = 0.05, ylim = c(-8, 8)) 
-dev.off()
-plotMA(res_humoral, alpha = 0.05, ylim = c(-8, 8)) 
-```
-**Кастомный MA plot**
-```{r}
-res_df <- res_humoral %>%
-  as.data.frame() %>%
-  mutate(color = case_when( 
-    padj < 0.05  ~ "padj < 0.05",   
-    pvalue < 0.05  ~ "pvalue < 0.05", 
-    TRUE ~ "All"
-  ))
-
-plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
-  geom_point(alpha = 0.7, size = 1) +
-  geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +
-  scale_color_manual(values = c("All" = "gray70", 
-                                "pvalue < 0.05" = "blue", 
-                                "padj < 0.05" = "red")) +
-  scale_x_log10(labels = scales::scientific) + 
-  theme_minimal() +
-  labs(x = "mean of normalized counts", 
-       y = "log fold change", 
-       color = NULL)
-
-plt
-ggsave("./pictures_transpl/transpl_Сustom MAplot_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-```
-
-**Значимые результаты**
-
-```{r}
-signres_humoral <- results(dds, contrast=c("condition", "humoral", "no_complications"), alpha=0.05) 
-summary(signres_humoral)
-```
-```{r}
-res_humoral_sorted <- as.data.frame(res_humoral[order(res_humoral$padj), ])
-res_humoral_sorted
-```
-**Visualisation for the first gene**
-```{r}
-#plotCounts(dds, gene=which.max(res_humoral$log2FoldChange), intgroup="condition")
-plotCounts(dds, gene=which.min(res_humoral$padj), intgroup="condition")
-#plotCounts(dds, gene=rownames(res)[which.min(res$padj[which.max(res$log2FoldChange)])], intgroup="condition")
-```
-**Визуализация в виде боксплотов**
-hsa-miR-193b-5p
-hsa-miR-1468-5p
-hsa-miR-5588-5p
-hsa-miR-100-5p
-hsa-miR-193b-3p
-hsa-miR-483-5p
-hsa-miR-197-5p
-hsa-miR-125b-5p
-hsa-miR-146a-5p
-```{r}
-# gene_idx <- which.min(res_humoral$padj)
-# gene_name <- rownames(res_humoral)[gene_idx]  
-
-selected_miRNA <- "hsa-miR-193b-3p"
-
-gene_idx <- which(rownames(res_humoral) == selected_miRNA)
-gene_name <- rownames(res_humoral)[gene_idx] 
-  
-count_data <- plotCounts(dds, gene=gene_idx, intgroup="condition", returnData=TRUE)
-count_data$sample <- gsub("_.*", "", rownames(count_data))  
-
-plt <- ggplot(count_data, aes(x=condition, y=count, fill=condition)) +
-  geom_boxplot(alpha=0.5) +
-  geom_text(aes(label=sample), size=3, vjust=-1) + 
-  geom_jitter(width=0.2, size=2, alpha=0.7) +
-  scale_y_log10() +
-  ggtitle(paste("Expression of", gene_name)) +
-  theme_minimal()
-
-plt
-ggsave("./pictures_transpl/transpl_boxplots_humoral_hsa-miR-193b-5p.tiff", plot = plt, width = 16, height = 10, dpi = 300)
-```
 **Volcano plot**
 
 ```{r}
-res_sign_humoral <- subset(res_humoral, padj < 0.05 & !is.na(padj) & abs(log2FoldChange) > 1.0)
-plt <- EnhancedVolcano(
-  res_humoral,
-  lab = rownames(res_humoral),
-  x = 'log2FoldChange',
-  y = 'padj',
-  pCutoff = 0.05,
-  FCcutoff = 1,
-  labSize = 3.0,
-  boxedLabels = FALSE,
-  col = c('black', '#CBD5E8', '#B3E2CD', 'red'),
-  colAlpha = 1,
-  title = NULL,
-  selectLab = rownames(res_sign_humoral),  # 👈 все метки будут отображены
-  drawConnectors = TRUE               # стрелочки, если метки накладываются
-)
+volcano_plots <- list()
+for(name in names(all_res)) {
+  volcano_plots[[name]] <- create_volcano_plot(
+    res_df = all_res[[name]],
+    res_sign_df = all_sign_res[[name]],
+    contrast_name = name,
+    output_file = file.path("figures", paste0("volcano_", name, ".png"))
+  )
+}
 
-plt
-ggsave("./pictures_transpl/transpl_VolcanoPlot_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+volcano_plots$humoral
+volcano_plots$cellular
+volcano_plots$CAV
 ```
+
+**Create boxplot for specific gene**
+
 ```{r}
-coldata_filtered <- coldata[coldata$condition %in% c("humoral", "no_complications"), ]
-coldata_filtered
+create_gene_boxplot(dds, "hsa-miR-100-5p", output_file = NULL)
 ```
-
 **Plot a heatmap of diff expressed genes**
 ```{r}
-res_sign_humoral <- subset(res_humoral, padj < 0.05 & !is.na(padj) & abs(log2FoldChange) > 1.0)
-res_sign_humoral <- res_sign_humoral[order(res_sign_humoral$log2FoldChange, decreasing = TRUE), ]
+source(here("src", "visualization.R"))
+heatmap_plots <- list()
+for(name in names(all_res)) {
+  volcano_plots[[name]] <- create_heatmap_diff_expressed(
+    res_sign_df = all_sign_res[[name]],
+    rlt, 
+    coldata = phenotable,
+    condition_col = "condition",
+    conditions = c("AMR", "NR"), scale_rows = FALSE # scale_rows = FALSE - actual counts.
+  )
+}
 
-sig_genes <- rownames(res_sign_humoral)  
-
-de_mat <- assay(rlt)[sig_genes, ] 
-
-de_mat_filtered <- de_mat[, coldata_filtered$sample]
-datamatrix <- t(scale(t(de_mat_filtered)))
-#datamatrix <- de_mat_filtered
-
-annotation_col <- data.frame(condition = coldata_filtered$condition)
-rownames(annotation_col) <- colnames(datamatrix)
-
-annotation_colors <- list(
-  condition = c("no_complications" = "#FFCC00", "humoral" = "#3399FF"))
-
-plt <- pheatmap(datamatrix,
-         cluster_rows = TRUE, 
-         show_rownames = TRUE, 
-         cluster_cols = TRUE, 
-         annotation_col = annotation_col,
-         annotation_colors = annotation_colors,
-         display_numbers = FALSE,
-         legend = TRUE,
-         fontsize = 15)  
-
-ggsave("./pictures_transpl/transpl_Heatmap of diff expressed genes_humoral.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+volcano_plots$humoral
 ```
-
-
 ### Анализ обогащения гуморальное отторжение###
 ```{r}
 up_humoral <- res_sign_humoral %>% 
@@ -330,21 +226,6 @@ ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_down_humoral_BP.tiff",
 ```{r}
 GO_enrich_down_humoral_bp@result$Description[1:20]
 ```
-**Возможный биологический смысл**
-*“Cell growth”, “Regulation of cell growth”, “Regulation of cell cycle phase transition”, “Mitotic nuclear division”, “DNA replication”, “Sister chromatid segregation”*  
-Гуморальное отторжение сопровождается воспалением и повреждением эндотелия сосудов трансплантата. В таких условиях наблюдается угнетение пролиферации клеток, особенно в эндотелии и кардиомиоцитах, из-за оксидативного стресса, цитокинового шторма и нарушения микроциркуляции.
-
-*“Proteasome-mediated ubiquitin-dependent protein catabolic process”, “Regulation of protein catabolic process”*. 
-Убиквитин-протеасомная система играет важную роль в удалении поврежденных и неправильно свернутых белков. Ее угнетение может привести к накоплению аномальных белков и усилению клеточного стресса, что ухудшает состояние трансплантата.
-
-*“Nucleocytoplasmic transport”, “Nuclear transport”*. 
-Активный ядерно-цитоплазматический транспорт необходим для правильного функционирования транскрипционных факторов и регуляции стрессовых ответов. Его снижение может указывать на нарушение клеточной регуляции в условиях воспаления.
-
-*“Axonogenesis”, “Regulation of neuron projection development”, “Dendrite development”*. 
-Могут быть связаны с регенерацией и реорганизацией нервных окончаний в сердечной ткани или с вовлечением паракринных факторов в воспалительный процесс.
-
-*“Regulation of chromosome organization”, “Chromosome segregation”, “Mitotic cell cycle phase transition”*. 
-Отторжение трансплантата сопровождается повышенной иммунной атакой, что может приводить к повреждению ДНК и нестабильности хромосом в клетках трансплантата.
 
 **Визуализация путей KEGG**
 
@@ -364,158 +245,6 @@ plt <- dotplot(GO_enrich_down_bp_KEGG, showCategory = 20) +
 plt
 ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_down_humoral_KEGG.tiff", plot = p1, width = 16, height = 10, dpi = 300)
 ```
-## Клеточное отторжение ##
-```{r}
-res_cellular <- results(dds, contrast=c("condition", "cellular", "no_complications"))
-res_cellular
-```
-**MA plot**
-
-```{r}
-tiff("./pictures_transpl/transpl_PlotMA_standart_padj_0.05_cellular.tiff", 
-     width = 8, height = 6, units = "in", res = 300, bg = "white")
-plotMA(res_cellular, alpha = 0.05, ylim = c(-8, 8)) 
-dev.off()
-plotMA(res_cellular, alpha = 0.05, ylim = c(-8, 8)) 
-```
-
-**Кастомный MA plot**
-```{r}
-res_df <- res_cellular %>%
-  as.data.frame() %>%
-  mutate(color = case_when( 
-    padj < 0.05  ~ "padj < 0.05",   
-    pvalue < 0.05  ~ "pvalue < 0.05", 
-    TRUE ~ "All"
-  ))
-
-plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
-  geom_point(alpha = 0.7, size = 1) +
-  geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +
-  scale_color_manual(values = c("All" = "gray70", 
-                                "pvalue < 0.05" = "blue", 
-                                "padj < 0.05" = "red")) +
-  scale_x_log10(labels = scales::scientific) + 
-  theme_minimal() +
-  labs(x = "mean of normalized counts", 
-       y = "log fold change", 
-       color = NULL)
-
-plt
-ggsave("./pictures_transpl/transpl_Сustom MAplot_cellular.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-```
-```{r}
-res_sign_cellular <- subset(res_cellular, pvalue < 0.05 & !is.na(pvalue) & abs(log2FoldChange) > 1.0)
-rownames(res_sign_cellular)
-```
-```{r}
-res_cellular_sorted <- as.data.frame(res_cellular[order(res_cellular$pvalue), ])
-res_cellular_sorted
-```
-
-
-
-## БКAПC ##
-```{r}
-res_TCAD <- results(dds, contrast=c("condition", "TCAD", "no_complications"))
-head(res_TCAD, 10)
-```
-
-**MA plot**
-```{r}
-tiff("./pictures_transpl/transpl_PlotMA_standart_padj_0.05_TCAD.tiff", 
-     width = 8, height = 6, units = "in", res = 300, bg = "white")
-plotMA(res_TCAD, alpha = 0.05, ylim = c(-8, 8)) 
-dev.off()
-plotMA(res_TCAD, alpha = 0.05, ylim = c(-8, 8)) 
-```
-**Кастомный MA plot**
-```{r}
-res_df <- res_TCAD %>%
-  as.data.frame() %>%
-  mutate(color = case_when( 
-    padj < 0.05  ~ "padj < 0.05",   
-    pvalue < 0.05  ~ "pvalue < 0.05", 
-    TRUE ~ "All"
-  ))
-
-plt <- ggplot(res_df, aes(x = baseMean, y = log2FoldChange, color = color)) +
-  geom_point(alpha = 0.7, size = 1) +
-  geom_hline(yintercept = 0, linetype = "solid", color = "gray40", size = 1.5) +
-  scale_color_manual(values = c("All" = "gray70", 
-                                "pvalue < 0.05" = "blue", 
-                                "padj < 0.05" = "red")) +
-  scale_x_log10(labels = scales::scientific) + 
-  theme_minimal() +
-  labs(x = "mean of normalized counts", 
-       y = "log fold change", 
-       color = NULL)
-
-plt
-ggsave("./pictures_transpl/transpl_Сustom_MAplot_TCAD.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-```
-**Значимые результаты**
-```{r}
-signres_TCAD <- results(dds, contrast=c("condition", "TCAD", "no_complications"), alpha=0.05) 
-summary(signres_TCAD)
-```
-**Volcano plot**
-```{r}
-plt <- EnhancedVolcano(res_TCAD,
-                lab = rownames(res_TCAD),
-                x = "log2FoldChange",
-                y = "padj",
-                pCutoff = 0.05,
-                FCcutoff = 1,
-                labSize = 3.0,
-                boxedLabels = FALSE,
-                col = c('black', '#CBD5E8', '#B3E2CD', 'red'),
-                colAlpha = 1,
-                title = NULL,        
-                subtitle = NULL) 
-
-plt
-ggsave("./pictures_transpl/transpl_VolcanoPlot_TCAD.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-```
-```{r}
-res_TCAD_sign <- subset(res_TCAD, pvalue < 0.05 & !is.na(pvalue) & abs(log2FoldChange) > 1.0)
-res_TCAD_sorted <- as.data.frame(res_TCAD_sign[order(res_TCAD_sign$pvalue), ])
-res_TCAD_sorted
-
-
-```
-
-
-```{r}
-gene_idx <- which.min(res_TCAD$padj)
-gene_name <- rownames(res_TCAD)[gene_idx]  
-
-# selected_miRNA <- "hsa-miR-193b-5p"
-# 
-# gene_idx <- which(rownames(res_humoral) == selected_miRNA)
-# gene_name <- rownames(res_humoral)[gene_idx] 
-  
-count_data <- plotCounts(dds, gene=gene_idx, intgroup="condition", returnData=TRUE)
-count_data$sample <- gsub("_.*", "", rownames(count_data))  
-
-plt <- ggplot(count_data, aes(x=condition, y=count, fill=condition)) +
-  geom_boxplot(alpha=0.5) +
-  geom_text(aes(label=sample), size=3, vjust=-1) + 
-  geom_jitter(width=0.2, size=2, alpha=0.7) +
-  scale_y_log10() +
-  ggtitle(paste("Expression of", gene_name)) +
-  theme_minimal()
-
-plt
-ggsave("./pictures_transpl/transpl_boxplots_TCAD_hsa-miR-582-3p.tiff", plot = plt, width = 16, height = 10, dpi = 300)
-```
-```{r}
-order_indices <- order(-res_TCAD$log2FoldChange)
-res_TCAD[order_indices, ]
-```
-
-
-
 
 **Анализ обогащения TCAD**
 ```{r}
@@ -564,26 +293,7 @@ p1
 
 ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_up_TCAD_bp.tiff", plot = p1, width = 16, height = 10, dpi = 300)
 ```
-*RNA splicing, regulation of RNA splicing, mRNA splicing via spliceosome, regulation of mRNA processing*
-	•	Гипоксия и оксидативный стресс → изменённый сплайсинг проапоптотических и пролиферативных генов (например, Bcl-x, VEGF).  
-	•	Дисфункция эндотелия → активация факторов, регулирующих сплайсинг (SRSF1, hnRNP).  
 
-*Wnt signaling pathway, canonical Wnt signaling pathway, regulation of Wnt signaling pathway, cell-cell signaling by Wnt*
-	•	Wnt участвует в ангиогенезе, регенерации тканей и фиброзе.  
-	•	Хроническое повреждение эндотелия требует ремоделирования сосудов.  
-	•	гипоксия и воспаление вызывают переключение Wnt на про-фибротический режим → стимулируется экспансия гладкомышечных клеток и утолщение интимы сосудов.  
-
-*RNA localization, establishment of RNA localization*
-	•	Стабильность мРНК важна для пролонгированного ответа на стресс.  
-	•	Воспаление вызывает сортировку мРНК к определённым компартментам клетки (например, к стрессовым гранулам).  
-	•	Увеличивается локализация мРНК VEGF в эндотелиальных клетках → усиленный ангиогенез.  
-	•	Перенос мРНК воспалительных медиаторов (TNF-α, IL-6) → хроническая иммунная активация.  
-
-*Osteoblast differentiation, in utero embryonic development*
-	•	При хроническом повреждении гладкомышечные клетки сосудов переходят в остеобластоподобные клетки → это вызывает кальцификацию сосудов.  
-	•	Аналогичные процессы происходят при хроническом воспалении и оксидативном стрессе.  
-	•	Wnt участвует в кальцификации сосудов трансплантата.  
-	•	Гипоксия стимулирует проостеогенные сигналы, активируя BMP-2 и RUNX2.  
 
 ```{r}
 GO_enrich_UP_TCAD_bp <- enrichplot::pairwise_termsim(GO_enrich_up_TCAD_bp, method = "JC")
@@ -622,39 +332,7 @@ plt <- dotplot(GO_enrich_up_TCAD_KEGG, showCategory = 20) +
 plt
 ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_UP_TCAD_KEGG.tiff", plot = plt, width = 16, height = 10, dpi = 300)
 ```
-*Справка по базам данным, по которым можно провести обогащение*
-1. C1 (Genomic Signature Prediction)
-	•	Включает генетические сигнатуры, которые используются для предсказания различных фенотипов или состояний, основанных на генетической информации. 299
-2. C2 (Curated Gene Sets)
-	•	CGP: Gene sets curated for cancer genomics 3384
-	•	CP: Gene sets curated for canonical pathways  29
-	•	CP:BIOCARTA: 292
-	•	CP:KEGG: 186
-	•	CP:PID: Pathway Interaction Database 196
-	•	CP:REACTOME: 1615
-	•	CP:WIKIPATHWAYS: 664
-3. C3 (Motif and Transcription Factor Gene Sets)
-	•	MIR:MIRDB: Наборы микроРНК из базы данных MIRDB.  2377
-	•	MIR_Legacy: Старые наборы микроРНК.  221
-	•	TFT:GTRD: Наборы генов, связанные с факторами транскрипции из GTRD (Gene Transcription Regulation Database).  518
-	•	TFT:TFT_Legacy: Старые наборы факторов транскрипции. 610
-4. C4 (Computational Gene Sets)
-	•	CGN: Наборы генов, связанные с компьютерными моделями или системами. 427
-	•	CM: Математические или вычислительные модели для анализа данных генетики. 431
-5. C5 (Gene Ontology Gene Sets)
-	•	GO:BP: Наборы генов, связанные с биологическими процессами (Biological Process). 7658
-	•	GO:CC: Наборы генов, связанные с клеточными компонентами (Cellular Component).  1006
-	•	GO:MF: Наборы генов, связанные с молекулярной функции (Molecular Function). 1738
-	•	HPO: Наборы генов, связанные с фенотипами, описанными в Human Phenotype Ontology. 5071
-6. C6 (Oncogenic Signatures)
-	•	Включает наборы генов, связанные с онкогенами и раковыми клетками. 189
-7. C7 (Immunologic Signature Gene Sets)
-	•	IMMUNESIGDB: Наборы генов, связанные с иммунной системой, включая иммуно-онкологию и другие аспекты иммунитета.  4872
-	•	VAX: Наборы генов, связанные с вакцинацией. 347
-8. C8 (Cell Type Signature Gene Sets)
-	•	Наборы генов, ассоциированные с различными типами клеток 700
-9. H (Hallmark Gene Sets)
-	•	Включает Hallmark Gene Sets, которые представляют ключевые биологические процессы и функции, общие для множества типов клеток и состояний. 50
+
 	
 ```{r}
 all_df <- read.csv("data/mapped.csv", header = TRUE, sep = ",")
@@ -697,65 +375,3 @@ rownames(collapsed_df) <- collapsed_df$ncRNA
 collapsed_df$ncRNA <- NULL
 head(collapsed_df)
 ```
-t-SNE = t-distributed Stochastic Neighbor Embedding
-
-Это алгоритм для понижения размерности, часто используемый для визуализации высокоразмерных данных 
-Как t-SNE работает:
-	1.	Считает расстояния между всеми парами точек во входных данных.
-	2.	Строит вероятности того, что точка A выберет точку B как соседа. (насколько точка A считает точку B близкой?)
-	•	Точки, которые были близки → останутся рядом.
-	•	Далёкие точки → могут оказаться где угодно.
-Главное не измерять расстояния между кластерами — это может быть иллюзией.
-
-https://distill.pub/2016/misread-tsne/
-```{r}
-tsne_input <- t(as.matrix(collapsed_df[, -1]))  # исключаем колонку ncRNA
-
-#самое сомнительное
-set.seed(41)  # для воспроизводимости
-tsne_result <- Rtsne(tsne_input, dims = 2, perplexity = 5, verbose = TRUE, max_iter = 500)
-
-
-tsne_df <- data.frame(
-  Sample = rownames(tsne_input),
-  tSNE1 = tsne_result$Y[,1],
-  tSNE2 = tsne_result$Y[,2]
-)
-
-tsne_df <- merge(tsne_df, coldata, by.x = "Sample", by.y = "sample")
-tsne_df$Sample <- gsub("_.*", "", tsne_df$Sample)
-
-plt <- ggplot(tsne_df, aes(x = tSNE1, y = tSNE2, color = condition)) +
-  geom_point(size = 3, alpha = 0.8) +
-  geom_text(aes(label=Sample), size=3, vjust=1.5) +
-  theme_minimal() +
-  labs(title = "t-SNE plot", x = "tSNE 1", y = "tSNE 2")
-
-plt
-ggsave("./pictures_transpl2/transpl_tSNE_plot.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-```
-```{r}
-tsne_input <- t(as.matrix(counts[, -1]))  # исключаем колонку ncRNA
-
-#самое сомнительное
-set.seed(41) 
-tsne_result <- Rtsne(tsne_input, dims = 2, perplexity = 5, verbose = TRUE, max_iter = 500)
-
-tsne_df <- data.frame(
-  Sample = rownames(tsne_input),
-  tSNE1 = tsne_result$Y[,1],
-  tSNE2 = tsne_result$Y[,2]
-)
-
-tsne_df <- merge(tsne_df, coldata, by.x = "Sample", by.y = "sample")
-tsne_df$Sample <- gsub("_.*", "", tsne_df$Sample)
-
-plt <- ggplot(tsne_df, aes(x = tSNE1, y = tSNE2, color = condition)) +
-  geom_point(size = 3, alpha = 0.8) +
-  geom_text(aes(label=Sample), size=3, vjust=1.5) +
-  theme_minimal() +
-  labs(title = "t-SNE plot", x = "tSNE 1", y = "tSNE 2")
-plt
-ggsave("./pictures_transpl2/transpl_tSNE_plot_only_miR.tiff", plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-```
-
