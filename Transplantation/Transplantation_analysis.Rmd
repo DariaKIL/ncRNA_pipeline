@@ -7,7 +7,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
 	echo = FALSE,
-	message = FALSE,
+	message = TRUE,
 	warning = FALSE
 )
 ```
@@ -139,239 +139,60 @@ create_gene_boxplot(dds, "hsa-miR-100-5p", output_file = NULL)
 ```
 **Plot a heatmap of diff expressed genes**
 ```{r}
-source(here("src", "visualization.R"))
 heatmap_plots <- list()
-for(name in names(all_res)) {
-  volcano_plots[[name]] <- create_heatmap_diff_expressed(
+for(name in names(CONTRASTS)) {
+  heatmap_plots[[name]] <- create_heatmap_diff_expressed(
     res_sign_df = all_sign_res[[name]],
-    rlt, 
+    rlt = rlt,
     coldata = phenotable,
-    condition_col = "condition",
-    conditions = c("AMR", "NR"), scale_rows = FALSE # scale_rows = FALSE - actual counts.
+    conditions = CONTRASTS[[name]][2:3],
+    output_file = file.path("results", paste0("heatmap_diff_", name, ".png"))
   )
 }
 
-volcano_plots$humoral
+heatmap_plots$humoral
+heatmap_plots$cellular
+heatmap_plots$CAV
 ```
-### Анализ обогащения гуморальное отторжение###
+### Enrichment analysis ###
+**Searching for targets**
 ```{r}
-up_humoral <- res_sign_humoral %>% 
-  as.data.frame() %>% 
-  filter(log2FoldChange > 0)
-down_humoral <- res_sign_humoral %>% 
-  as.data.frame() %>% 
-  filter(log2FoldChange < 0)
-rownames(up_humoral)
-rownames(down_humoral)
-```
-**Конвертация в MIMATID** 
-```{r}
-converted_up_humoral <- miRNAVersionConvert(rownames(up_humoral))
-converted_up_humoral
-```
-**Запрос таргетов из базы multiMiR** 
-```{r}
-targets_humoral_down <- unique(get_multimir(org = "hsa", mirna = converted_up_humoral$Accession, table = "validated")@data$target_symbol)
-#writeLines(targets_down, "targets_down150_list.txt")
-```
-**Анализ обогащения из базы биологических процессов**
-```{r}
-#msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "GO:BP")
-# targets_down <- readLines("targets_down150_list.txt")
-# targets_up <- readLines("targets_up150_list.txt")
-
-GO_enrich_down_humoral_bp <- enrichGO(
-  gene          = targets_humoral_down,  
-  OrgDb         = org.Hs.eg.db,
-  keyType       = "SYMBOL",
-  ont           = "BP", 
-  pAdjustMethod = "BH",
-  qvalueCutoff  = 0.05
-)
-```
-
-**Визуализация**
-```{r}
-
-library(scales)
-
-p1 <- dotplot(GO_enrich_down_humoral_bp, showCategory = 20) +
-  ggtitle("GO Enrichment for DOWNregulated targets") +
-  theme(
-    plot.title = element_text(size = 20, face = "bold"),
-    axis.text.y = element_text(size = 20)
-  ) +
-  scale_y_discrete(labels = function(x) str_wrap(x, width = 40))
-
-p1
-
-ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_down_humoral_bp.tiff", plot = p1, width = 16, height = 10, dpi = 300)
-```
-```{r}
-GO_enrich_DOWN_humoral_BP <- enrichplot::pairwise_termsim(GO_enrich_down_humoral_bp, method = "JC")
-
-plt <- emapplot(GO_enrich_DOWN_humoral_BP, 
-         repel = TRUE,
-         showCategory = 20) +
-  ggtitle("Biological processes for DOWNregulated targets for humoral") +
-  theme(
-    plot.title = element_text(size = 12, face = "bold"),
-    axis.text = element_text(size = 3)
-    )    
-
-plt
-
-ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_down_humoral_BP.tiff", plot = plt, width = 16, height = 10, dpi = 300)
-```
-```{r}
-GO_enrich_down_humoral_bp@result$Description[1:20]
-```
-
-**Визуализация путей KEGG**
-
-```{r}
-msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG")
-
-
-GO_enrich_down_bp_KEGG <- enricher(gene = targets_humoral_down, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
-
-plt <- dotplot(GO_enrich_down_bp_KEGG, showCategory = 20) + 
-  ggtitle("GO Enrichment for DOWNregulated targets") + 
-  theme(
-    plot.title = element_text(size = 14, face = "bold"),
-    axis.text.y = element_text(size = 12)
+source(here("src", "enrichment.R"))
+targets_list <- list()
+for(name in names(all_sign_res)) {
+  targets_list[[name]] <- convert_miRNA_versions(
+    res_sign_df = all_sign_res[[name]],
+    contrast_name = name,
+    table = "validated"
   )
-
-plt
-ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_down_humoral_KEGG.tiff", plot = p1, width = 16, height = 10, dpi = 300)
+}
 ```
-
-**Анализ обогащения TCAD**
+**Perform KEGG enrichment analysis**
 ```{r}
-res_sign_TCAD <- subset(res_TCAD, padj < 0.05 & !is.na(padj) & abs(log2FoldChange) > 1.0)
+kegg_plots <- list()
 
-up_TCAD <- res_sign_TCAD %>% 
-  as.data.frame() %>% 
-  filter(log2FoldChange > 0)
-down_TCAD <- res_sign_TCAD %>% 
-  as.data.frame() %>% 
-  filter(log2FoldChange < 0)
-rownames(up_TCAD)
-rownames(down_TCAD)
-```
+for (contrast in names(targets_list)) {
+  kegg_plots[[contrast]] <- list()
+  
+  for (direction in c("up", "down")) {
+    gene_list <- targets_list[[contrast]][[direction]]
+    
+    if (length(gene_list) == 0) {
+      message(sprintf("No genes for %s %s. Skipping...", contrast, direction))
+      kegg_plots[[contrast]][[direction]] <- NULL
+      next
+    }
+    
+    kegg_plots[[contrast]][[direction]] <- perform_kegg_enrichment(
+      gene_list,
+      contrast_name = contrast,
+      direction = direction
+    )
+  }
+}
 
-
-
-```{r}
-converted_down_TCAD <- miRNAVersionConvert(rownames(down_TCAD))
-converted_down_TCAD
-```
-**Запрос таргетов из базы multiMi**
-```{r}
-targets_TCAD_up <- unique(get_multimir(org = "hsa", mirna = converted_down_TCAD$Accession, table = "validated")@data$target_symbol)
-```
-**Анализ обогащения из базы биологических процессов**
-```{r}
-GO_enrich_up_TCAD_bp <- enrichGO(
-  gene          = targets_TCAD_up,  
-  OrgDb         = org.Hs.eg.db,
-  keyType       = "SYMBOL",
-  ont           = "BP", 
-  pAdjustMethod = "BH",
-  qvalueCutoff  = 0.05
-)
-
-p1 <- dotplot(GO_enrich_up_TCAD_bp, showCategory = 20) + 
-  ggtitle("GO Enrichment for UPregulated targets TCAD") + 
-  theme(
-    plot.title = element_text(size = 20, face = "bold"),
-    axis.text.y = element_text(size = 18)
-  ) +
-  scale_y_discrete(labels = function(x) str_wrap(x, width = 40))
-
-p1
-
-ggsave("./pictures_transpl/transpl_GO_enrichment_dotplot_up_TCAD_bp.tiff", plot = p1, width = 16, height = 10, dpi = 300)
-```
-
-
-```{r}
-GO_enrich_UP_TCAD_bp <- enrichplot::pairwise_termsim(GO_enrich_up_TCAD_bp, method = "JC")
-
-plt <- emapplot(GO_enrich_UP_TCAD_bp, 
-         repel = TRUE,
-         showCategory = 20) +
-  ggtitle("Biological processes for UPregulated targets for TCAD") +
-  theme(
-    plot.title = element_text(size = 12, face = "bold"),
-    axis.text = element_text(size = 3)
-    )    
-
-plt
-
-ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_UP_TCAD_BP.tiff", plot = plt, width = 16, height = 10, dpi = 300)
-```
-```{r}
-GO_enrich_up_TCAD_bp@result$Description[1:20]
-```
-
-
-**Визуализация путей KEGG**
-```{r}
-msig_go_bp <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG")
-
-
-GO_enrich_up_TCAD_KEGG <- enricher(gene = targets_TCAD_up, TERM2GENE = msig_go_bp[, c("gs_name", "gene_symbol")])
-
-plt <- dotplot(GO_enrich_up_TCAD_KEGG, showCategory = 20) +
-  ggtitle("GO Enrichment for UPregulated targets") +
-  theme(
-    plot.title = element_text(size = 14, face = "bold"),
-    axis.text.y = element_text(size = 12)
-  )
-plt
-ggsave("./pictures_transpl/transpl_GO_enrichment_emapplot_UP_TCAD_KEGG.tiff", plot = plt, width = 16, height = 10, dpi = 300)
-```
-
-	
-```{r}
-all_df <- read.csv("data/mapped.csv", header = TRUE, sep = ",")
-all_df <- all_df[, -c(1, 2)]
-cols <- c("exact.miRNA", "hairpin.miRNA", "mature.tRNA", "primary.tRNA", "snoRNA", "rRNA", "ncrna.others", "mRNA", "isomiR.miRNA")
-all_df[cols] <- lapply(all_df[cols], function(x) ifelse(x == "", NA, x))
-str(all_df)
-```
-
-```{r}
-all_df$merged_col <- apply(all_df[, c("exact.miRNA", "hairpin.miRNA", "mature.tRNA", "primary.tRNA", "snoRNA", "rRNA", "ncrna.others", "mRNA", "isomiR.miRNA")], 1, function(x) na.omit(x)[1])
-all_df <- all_df[, -c(1:9)]
-all_df
-```
-
-```{r}
-collapsed_df <- all_df %>%
-  group_by(merged_col) %>%
-  summarise(across(everything(), sum, na.rm = FALSE)) %>%
-  as.data.frame()  
-rownames(collapsed_df) <- collapsed_df$merged_col
-collapsed_df$merged_col <- NULL 
-# write.csv(collapsed_df, file="./collapsed_df.csv")
-```
-
-```{r}
-# collapsed_df <- read.csv("./collapsed_df.csv", header = TRUE, sep = ",")
-rownames(collapsed_df) <- collapsed_df$X
-collapsed_df$X <- NULL
-collapsed_df
-```
-```{r}
-colnames(collapsed_df) <- gsub("^X", "", colnames(collapsed_df))
-common_samples <- intersect(colnames(collapsed_df), coldata$sample)
-collapsed_df <- rownames_to_column(collapsed_df, var = "ncRNA")
-
-collapsed_df <- collapsed_df[, c("ncRNA", common_samples)] 
-# collapsed_df <- collapsed_df[, rownames(coldata)] #ранжирую по колонке в counts так же как и названия строк в coldata
-rownames(collapsed_df) <- collapsed_df$ncRNA
-collapsed_df$ncRNA <- NULL
-head(collapsed_df)
+# пример обращения
+kegg_plots$humoral$up
+kegg_plots$humoral$down
+kegg_plots$CAV$up
 ```

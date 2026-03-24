@@ -381,70 +381,56 @@ create_gene_boxplot <- function(dds, gene, output_file = NULL) {
   return(plt)
 }
 
-#' Create heatmap of differentially expressed genes
-
-create_heatmap_diff_expressed <- function(res_sign_df, rlt, coldata, condition_col = "condition",
-                                          conditions = NULL, output_file = NULL, scale_rows = TRUE) {
+create_heatmap_diff_expressed <- function(res_sign_df,
+                                          rlt,
+                                          coldata,
+                                          condition_col = "condition",
+                                          conditions,
+                                          output_file = NULL,
+                                          scale_rows = TRUE) {
   
-  # Check if there are enough significant genes
   if (is.null(res_sign_df) || nrow(res_sign_df) < 2) {
-    message("No significant genes to plot for this contrast. Skipping...")
     return(NULL)
   }
   
-  # Get expression matrix for significant genes
   de_mat <- assay(rlt)[rownames(res_sign_df), , drop = FALSE]
   
-  # Filter samples by selected conditions (or use all if NULL)
-  if (!is.null(conditions)) {
-    coldata_filtered <- coldata[coldata[[condition_col]] %in% conditions, , drop = FALSE]
-  } else {
-    coldata_filtered <- coldata
-  }
+  coldata_filtered <- coldata[
+    coldata[[condition_col]] %in% conditions &
+      coldata$sample %in% colnames(de_mat),
+    ,
+    drop = FALSE
+  ]
   
-  # Keep only samples that exist in the expression matrix
-  coldata_filtered <- coldata_filtered[coldata_filtered$sample %in% colnames(de_mat), , drop = FALSE]
-  
-  # Drop NA in condition column
-  coldata_filtered <- coldata_filtered[!is.na(coldata_filtered[[condition_col]]), , drop = FALSE]
-  
-  # Subset expression matrix
   de_mat_filtered <- de_mat[, coldata_filtered$sample, drop = FALSE]
-  
-  if (ncol(de_mat_filtered) < 2) {
-    message("Not enough samples to plot heatmap. Skipping...")
-    return(NULL)
-  }
-  
-  # Scale by row if requested
+
   datamatrix <- if(scale_rows) t(scale(t(de_mat_filtered))) else de_mat_filtered
   
-  # Create annotation dataframe for columns with nice sample names
-  annotation_col <- data.frame(condition = coldata_filtered[[condition_col]])
-  rownames(annotation_col) <- paste0(gsub("_.*", "", coldata_filtered$sample), "_", coldata_filtered[[condition_col]])
-  colnames(datamatrix) <- rownames(annotation_col)
+  annotation_col <- data.frame(
+    condition = coldata_filtered[
+      match(colnames(datamatrix), coldata_filtered$sample),
+      condition_col
+    ]
+  )
+  rownames(annotation_col) <- colnames(datamatrix)
   
-  # Only pick colors for levels present in filtered data
-  cond_levels <- unique(annotation_col$condition)
-  palette_colors <- RColorBrewer::brewer.pal(min(8, length(cond_levels)), "Set2")
-  annotation_colors <- list(condition = setNames(palette_colors, cond_levels))
+
+  plt <- pheatmap(
+    datamatrix,
+    cluster_rows = TRUE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    annotation_col = annotation_col,
+    fontsize = 12
+  )
   
-  # Create heatmap
-  plt <- pheatmap(datamatrix,
-                  cluster_rows = TRUE,
-                  cluster_cols = TRUE,
-                  show_rownames = TRUE,
-                  annotation_col = annotation_col,
-                  annotation_colors = annotation_colors,
-                  fontsize = 12)
-  
-  # Save plot if needed
   if(!is.null(output_file)) {
-    ggsave(output_file, plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
+    ggsave(output_file, width = 8, height = 6, dpi = 300)
   }
   
   return(plt)
 }
+
 
 #' Create GO enrichment dotplot
 #'
@@ -468,72 +454,4 @@ create_go_enrichment_dotplot <- function(go_enrichment, title, output_file = NUL
   }
   
   return(p1)
-}
-
-#' Create GO enrichment emapplot
-#'
-#' @param go_enrichment GO enrichment result
-#' @param title Plot title
-#' @param output_file Output file path
-#' @return ggplot object
-create_go_enrichment_emapplot <- function(go_enrichment, title, output_file = NULL) {
-  # Create pairwise termsim
-  GO_enrich_BP <- enrichplot::pairwise_termsim(go_enrichment, method = "JC")
-  
-  # Create plot
-  plt <- emapplot(GO_enrich_BP, 
-           repel = TRUE,
-           showCategory = 20) +
-    ggtitle(title) +
-    theme(
-      plot.title = element_text(size = 12, face = "bold"),
-      axis.text = element_text(size = 3)
-    )    
-  
-  # Save if output file specified
-  if (!is.null(output_file)) {
-    ggsave(output_file, plot = plt, width = 16, height = 10, dpi = 300)
-  }
-  
-  return(plt)
-}
-
-#' Create t-SNE plot
-#'
-#' @param data Expression matrix
-#' @param coldata Phenotype data
-#' @param output_file Output file path
-#' @return ggplot object
-create_tsne_plot <- function(data, coldata, output_file = NULL) {
-  # Prepare data for t-SNE
-  tsne_input <- t(as.matrix(data[, -1]))  # exclude first column
-  
-  # Run t-SNE
-  set.seed(41)  # for reproducibility
-  tsne_result <- Rtsne(tsne_input, dims = 2, perplexity = 5, verbose = TRUE, max_iter = 500)
-  
-  # Create data frame
-  tsne_df <- data.frame(
-    Sample = rownames(tsne_input),
-    tSNE1 = tsne_result$Y[,1],
-    tSNE2 = tsne_result$Y[,2]
-  )
-  
-  # Merge with phenotype data
-  tsne_df <- merge(tsne_df, coldata, by.x = "Sample", by.y = "sample")
-  tsne_df$Sample <- gsub("_.*", "", tsne_df$Sample)
-  
-  # Create plot
-  plt <- ggplot(tsne_df, aes(x = tSNE1, y = tSNE2, color = condition)) +
-    geom_point(size = 3, alpha = 0.8) +
-    geom_text(aes(label=Sample), size=3, vjust=1.5) +
-    theme_minimal() +
-    labs(title = "t-SNE plot", x = "tSNE 1", y = "tSNE 2")
-  
-  # Save if output file specified
-  if (!is.null(output_file)) {
-    ggsave(output_file, plot = plt, width = 8, height = 6, dpi = 300, bg = "white")
-  }
-  
-  return(plt)
 }
